@@ -1,0 +1,8 @@
+version: 2.1
+
+description: >
+  Simplifies installation and use of Grype within CircleCI, used to perform vulnerability scans of container images.
+
+display:
+  home_url: "https://github.com/juburr/grype-orb"
+  source_url: "https://github.com/juburr/grype-orb"
