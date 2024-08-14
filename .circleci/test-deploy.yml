@@ -28,7 +28,10 @@ jobs:
     steps:
       - checkout
       # Run your orb's commands to validate them.
-      - grype-orb/greet
+      - grype-orb/install
+      - run:
+          name: Verify Install
+          command: command -v grype
 
 workflows:
   test-deploy:
