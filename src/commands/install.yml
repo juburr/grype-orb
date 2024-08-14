@@ -1,0 +1,41 @@
+description: Installs the grype binary. This command should be invoked prior to calling any other commands.
+parameters:
+  caching:
+    type: boolean
+    default: true
+  install_path:
+    type: string
+    default: "/home/circleci/bin"
+    description: Path to a binary directory not requiring root access (no trailing slash).
+  verify_checksums:
+    type: enum
+    enum: ["false", "known_versions", "strict"]
+    default: strict
+    description: Option to perform SHA-512 checksum verification on the downloaded Grype executable.
+  version:
+    type: string
+    default: "0.79.6"
+    description: Specify the semver of the Grype version to install.
+steps:
+  - when:
+      condition: << parameters.caching >>
+      steps:
+        - restore_cache:
+            key: grype-cache-<< parameters.version >>
+  - run:
+      name: Install Grype
+      environment:
+        PARAM_INSTALL_PATH: << parameters.install_path >>
+        PARAM_VERIFY_CHECKSUMS: << parameters.verify_checksums >>
+        PARAM_VERSION: << parameters.version >>
+      command: << include(scripts/install.sh) >>
+  - when:
+      condition: << parameters.caching >>
+      steps:
+        - save_cache:
+            key: grype-cache-<< parameters.version >>
+            paths:
+              - grype.tar.gz
+  - run:
+      name: Cleanup Grype Install
+      command: rm grype.tar.gz

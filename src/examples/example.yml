@@ -1,13 +1,17 @@
 description: >
-  Sample example description.
-# Provide a use-case based example for using this orb.
-# Everything in the `usage` section will be displayed in the orb registry.
-# Comments are not retained.
+  The `install` command is used to simplify installation of Grype.
+
 usage:
   version: 2.1
   orbs:
     grype: juburr/grype-orb@0.0.1
+  jobs:
+    publish-chart:
+      docker:
+        - image: cimg/base:stable
+      steps:
+        - grype/install
   workflows:
     use-my-orb:
       jobs:
-        - grype/greet
+        - publish-chart
