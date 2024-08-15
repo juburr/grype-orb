@@ -1,0 +1,28 @@
+description: Scans a container image using grype.
+parameters:
+  fail_on:
+    type: enum
+    enum: ["", "negligible", "low", "medium", "high", "critical"]
+    default: ""
+    description: Exits with error code 1 if a vulnerability is found at or above the supplied severity level.
+  image:
+    type: string
+    description: Container image to scan.
+  output_format:
+    type: enum
+    enum: ["json", "table", "cyclonedx", "cyclonedx-json", "sarif", "template"]
+    default: json
+    description: Format of the output report.
+  output_file:
+    type: string
+    default: grype-scan-results.json
+    description: File to output scan results to.
+steps:
+  - run:
+      name: Scan Image
+      environment:
+        PARAM_FAIL_ON: << parameters.fail_on >>
+        PARAM_IMAGE: << parameters.image >>
+        PARAM_OUTPUT_FILE: << parameters.output_file >>
+        PARAM_OUTPUT_FORMAT: << parameters.output_format >>
+      command: << include(scripts/scan_image.sh) >>

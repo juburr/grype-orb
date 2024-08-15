@@ -53,8 +53,12 @@ jobs:
           version: << pipeline.parameters.grype_version >>
       - grype/log_version
       - grype/update_database
+      - grype/scan_image:
+          fail_on: critical
+          image: gcr.io/distroless/base:latest
+          output_file: distroless.base.scan.json
+          output_format: json
       - run:
-          name: Scan Grype Image
-          command: |
-            grype << parameters.image >> -o json --add-cpes-if-none > grype.results.json
+          name: Log Scan Results
+          command: cat distroless.base.scan.json
 ```
