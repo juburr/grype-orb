@@ -36,6 +36,13 @@ jobs:
             grype version
       - grype-orb/log_version
       - grype-orb/update_database
+      - grype-orb/scan_image:
+          image: gcr.io/distroless/base:latest
+          output_file: distroless.base.scan.json
+          output_format: json
+      - run:
+          name: Log Scan Results
+          command: cat distroless.base.scan.json
 
 workflows:
   test-deploy:
