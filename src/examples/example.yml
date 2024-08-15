@@ -11,6 +11,8 @@ usage:
         - image: cimg/base:stable
       steps:
         - grype/install
+        - grype/log_version
+        - grype/update_database
   workflows:
     use-my-orb:
       jobs:

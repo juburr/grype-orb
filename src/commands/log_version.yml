@@ -1,0 +1,5 @@
+description: Logs the grype version to your CircleCI output for debugging purposes.
+steps:
+  - run:
+      name: Log Grype Version
+      command: << include(scripts/extract_grype_version.sh) >>

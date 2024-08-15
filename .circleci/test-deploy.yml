@@ -31,7 +31,11 @@ jobs:
       - grype-orb/install
       - run:
           name: Verify Install
-          command: command -v grype
+          command: |
+            command -v grype
+            grype version
+      - grype-orb/log_version
+      - grype-orb/update_database
 
 workflows:
   test-deploy:
