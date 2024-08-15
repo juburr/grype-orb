@@ -1,0 +1,37 @@
+description: Updates the grype vulnerability database.
+parameters:
+  caching:
+    type: boolean
+    default: true
+    description: |
+      Option to cache the vulnerability database in the pipeline. The installation is typically
+      faster than the cache restoration most of the time, but anchore.io can slow to a crawl at
+      peak hours and sometimes fail. We therefore recommend the use of caching at this time.
+  database_path:
+    type: string
+    default: "/home/circleci/.cache/grype/db"
+    description: Path to a directory where vulnerability database is stored (no trailing slash).
+steps:
+  - run:
+      name: Capture Grype Version
+      command: << include(scripts/extract_grype_version.sh) >>
+  - when:
+      condition: << parameters.caching >>
+      steps:
+        - restore_cache:
+            key: grype-vuln-db-cache-v1
+  - run:
+      name: Update Vulnerability Database
+      environment:
+        PARAM_DATABASE_PATH: << parameters.database_path >>
+      command: << include(scripts/update_database.sh) >>
+  - when:
+      condition: << parameters.caching >>
+      steps:
+        - save_cache:
+            key: grype-vuln-db-cache-v1
+            paths:
+              - << parameters.database_path >>
+  - run:
+      name: Log Vulnerability Databases
+      command: grype db list

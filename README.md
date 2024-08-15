@@ -15,3 +15,46 @@ This is an unofficial Grype orb used for installing Grype in your CircleCI pipel
 - **Provenance**: Installs directly from Grype's official [releases page](https://github.com/anchore/grype/releases/) on GitHub. No third-party websites, domains, or proxies are used.
 - **Confidentiality**: All secrets and environment variables are handled in accordance with CircleCI's [security recommendations](https://circleci.com/docs/security-recommendations/) and [best practices](https://circleci.com/docs/orbs-best-practices/).
 - **Privacy**: No usage data of any kind is collected or shipped back to the orb developer.
+
+Info for security teams:
+- Required external access to allow, if running a locked down, self-hosted CircleCI pipeline on-prem:
+  - `github.com`: For download and installation of the Grype tool.
+  - `toolbox-data.anchore.io`: For updating the vulnerability database.
+
+## Example Usage
+
+```yaml
+version: 2.1
+
+orbs:
+  grype: juburr/grype-orb@0.1.1
+
+parameters:
+  cimg_base_version:
+    type: string
+    default: "stable-20.04"
+  grype_version:
+    type: string
+    default: "0.79.6"
+
+jobs:
+  scan_container:
+    docker:
+      - image: cimg/base:<< pipeline.parameters.cimg_base_version >>
+    parameters:
+      image:
+        type: string
+        description: "container image to scan"
+    steps:
+      - checkout
+      - grype/install:
+          caching: true
+          verify_checksums: strict
+          version: << pipeline.parameters.grype_version >>
+      - grype/log_version
+      - grype/update_database
+      - run:
+          name: Scan Grype Image
+          command: |
+            grype << parameters.image >> -o json --add-cpes-if-none > grype.results.json
+```
