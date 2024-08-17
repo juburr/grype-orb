@@ -56,9 +56,9 @@ jobs:
       - grype/scan_image:
           fail_on: critical
           image: gcr.io/distroless/base:latest
-          output_file: distroless.base.scan.json
-          output_format: json
+          output_file: gcr.distroless.base.grype.sarif
+          output_format: sarif
       - run:
           name: Log Scan Results
-          command: cat distroless.base.scan.json
+          command: cat gcr.distroless.base.grype.sarif
 ```
