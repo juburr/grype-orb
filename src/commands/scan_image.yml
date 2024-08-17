@@ -11,11 +11,11 @@ parameters:
   output_format:
     type: enum
     enum: ["json", "table", "cyclonedx", "cyclonedx-json", "sarif", "template"]
-    default: json
+    default: sarif
     description: Format of the output report.
   output_file:
     type: string
-    default: grype-scan-results.json
+    default: grype-scan-results.sarif
     description: File to output scan results to.
 steps:
   - run:
