@@ -27,7 +27,7 @@ Info for security teams:
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@0.1.1
+  grype: juburr/grype-orb@0.3.2
 
 parameters:
   cimg_base_version:
