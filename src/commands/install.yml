@@ -14,7 +14,7 @@ parameters:
     description: Option to perform SHA-512 checksum verification on the downloaded Grype executable.
   version:
     type: string
-    default: "0.80.0"
+    default: "0.80.1"
     description: Specify the semver of the Grype version to install.
 steps:
   - when:
