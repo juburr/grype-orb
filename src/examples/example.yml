@@ -4,11 +4,11 @@ description: >
 usage:
   version: 2.1
   orbs:
-    grype: juburr/grype-orb@0.3.5
+    grype: juburr/grype-orb@0.3.6
   jobs:
     publish-chart:
       docker:
-        - image: cimg/base:stable
+        - image: cimg/base:current-22.04
       steps:
         - grype/install
         - grype/log_version
