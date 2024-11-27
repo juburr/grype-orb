@@ -27,7 +27,7 @@ Info for security teams:
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@0.3.6
+  grype: juburr/grype-orb@0.3.7
 
 parameters:
   cimg_base_version:
@@ -35,7 +35,7 @@ parameters:
     default: "current-22.04"
   grype_version:
     type: string
-    default: "0.82.1"
+    default: "0.85.0"
 
 jobs:
   scan_container:
