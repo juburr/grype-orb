@@ -201,7 +201,14 @@ fi
 # If there was no cache hit, go ahead and re-download the binary.
 # Tar it up to save on cache space used.
 if [[ ! -f grype ]]; then
-    wget "https://github.com/anchore/grype/releases/download/v${VERSION}/grype_${VERSION}_linux_amd64.tar.gz" -O grype.tar.gz
+    if command -v wget &> /dev/null; then
+        wget "https://github.com/anchore/grype/releases/download/v${VERSION}/grype_${VERSION}_linux_amd64.tar.gz" -O grype.tar.gz
+    elif command -v curl &> /dev/null; then
+        curl -L "https://github.com/anchore/grype/releases/download/v${VERSION}/grype_${VERSION}_linux_amd64.tar.gz" -o grype.tar.gz
+    else
+        echo "ERROR: Neither wget nor curl is available. Please install one of them."
+        exit 1
+    fi
     tar -xvzf grype.tar.gz grype
 fi
 
