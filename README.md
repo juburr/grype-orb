@@ -35,7 +35,7 @@ parameters:
     default: "current-22.04"
   grype_version:
     type: string
-    default: "0.92.1"
+    default: "0.107.0"
 
 jobs:
   scan_container:
