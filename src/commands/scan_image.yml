@@ -1,4 +1,4 @@
-description: Scans a container image using grype.
+description: Scans a container image, SBOM, directory, or other Grype source.
 parameters:
   fail_on:
     type: enum
@@ -7,7 +7,24 @@ parameters:
     description: Exits with error code 1 if a vulnerability is found at or above the supplied severity level.
   image:
     type: string
-    description: Container image to scan.
+    default: ""
+    description: >
+      Backward-compatible container image input. Mutually exclusive with
+      source; prefer source for new configurations.
+  source:
+    type: string
+    default: ""
+    description: >
+      Grype source to scan, including image references and explicit schemes
+      such as sbom:, dir:, registry:, docker:, or oci-dir:.
+  config:
+    type: string
+    default: ""
+    description: Optional Grype configuration file passed with --config.
+  only_fixed:
+    type: boolean
+    default: false
+    description: When true, report only vulnerabilities that have a fix.
   output_format:
     type: enum
     enum: ["json", "table", "cyclonedx", "cyclonedx-json", "sarif", "template"]
@@ -22,7 +39,10 @@ steps:
       name: Scan Image
       environment:
         PARAM_FAIL_ON: << parameters.fail_on >>
+        PARAM_CONFIG: << parameters.config >>
         PARAM_IMAGE: << parameters.image >>
+        PARAM_ONLY_FIXED: << parameters.only_fixed >>
         PARAM_OUTPUT_FILE: << parameters.output_file >>
         PARAM_OUTPUT_FORMAT: << parameters.output_format >>
+        PARAM_SOURCE: << parameters.source >>
       command: << include(scripts/scan_image.sh) >>
