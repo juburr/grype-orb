@@ -43,6 +43,18 @@ jobs:
       - run:
           name: Log Scan Results
           command: cat distroless.base.scan.json
+      - run:
+          name: Create a minimal Grype policy file
+          command: printf '{}\n' > /tmp/grype-orb-test.yaml
+      - grype-orb/scan_image:
+          source: dir:.
+          config: /tmp/grype-orb-test.yaml
+          only_fixed: true
+          output_file: repository.scan.json
+          output_format: json
+      - run:
+          name: Verify source/config/only-fixed scan
+          command: test -s repository.scan.json
 
 workflows:
   test-deploy:

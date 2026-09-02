@@ -6,7 +6,10 @@
 
 [![CircleCI Build Status](https://circleci.com/gh/juburr/grype-orb.svg?style=shield "CircleCI Build Status")](https://circleci.com/gh/juburr/grype-orb) [![CircleCI Orb Version](https://badges.circleci.com/orbs/juburr/grype-orb.svg)](https://circleci.com/developer/orbs/orb/juburr/grype-orb) [![GitHub License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](https://raw.githubusercontent.com/juburr/grype-orb/master/LICENSE) [![CircleCI Community](https://img.shields.io/badge/community-CircleCI%20Discuss-343434.svg)](https://discuss.circleci.com/c/ecosystem/orbs)
 
-This is an unofficial Grype orb used for installing Grype in your CircleCI pipeline and performing vulnerability scans of your container images. Contributions are welcome!
+This is an unofficial Grype orb used for installing Grype in your CircleCI
+pipeline and performing vulnerability scans of container images, SBOMs,
+directories, registries, and other Grype-supported sources. Contributions are
+welcome!
 
 ## Features
 ### **Secure By Design**
@@ -62,3 +65,31 @@ jobs:
           name: Log Scan Results
           command: cat gcr.distroless.base.grype.sarif
 ```
+
+## Scan sources and policy
+
+`scan_image` retains its original `image` parameter for backward
+compatibility. New configurations can use the more accurately named `source`
+parameter with any source syntax supported by Grype. Set exactly one of
+`source` or `image`.
+
+```yaml
+- grype/scan_image:
+    source: sbom:./forge.cdx.json
+    config: .grype.yaml
+    only_fixed: true
+    fail_on: high
+    output_format: sarif
+    output_file: forge.grype.sarif
+
+- grype/scan_image:
+    source: dir:.
+    output_format: json
+    output_file: repository.grype.json
+```
+
+The `config` parameter is passed to Grype as `--config`, allowing a committed
+policy file to carry ignore rules. Repositories can pair that file with their
+own CI validation for required rationale and expiry metadata. `only_fixed`
+passes `--only-fixed`. The existing `fail_on` parameter remains optional;
+leave it empty to report findings without gating.
