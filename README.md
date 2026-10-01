@@ -22,7 +22,8 @@ welcome!
 Info for security teams:
 - Required external access to allow, if running a locked down, self-hosted CircleCI pipeline on-prem:
   - `github.com`: For download and installation of the Grype tool.
-  - `grype.anchore.io`: For updating the vulnerability database.
+  - `grype.anchore.io`: For vulnerability database updates on Grype 0.88.0 and later, including the default version.
+  - `toolbox-data.anchore.io`: For vulnerability database updates on Grype 0.87.0 and earlier.
 
 ## Example Usage
 

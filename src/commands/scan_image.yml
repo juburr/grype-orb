@@ -4,7 +4,9 @@ parameters:
     type: enum
     enum: ["", "negligible", "low", "medium", "high", "critical"]
     default: ""
-    description: Exits with error code 2 if a vulnerability is found at or above the supplied severity level.
+    description: >
+      Exits with error code 2 if a vulnerability is found at or above the
+      supplied severity level. Grype 0.91.0 and earlier exit with error code 1.
   image:
     type: string
     default: ""
