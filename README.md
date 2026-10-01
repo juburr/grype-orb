@@ -22,7 +22,7 @@ welcome!
 Info for security teams:
 - Required external access to allow, if running a locked down, self-hosted CircleCI pipeline on-prem:
   - `github.com`: For download and installation of the Grype tool.
-  - `toolbox-data.anchore.io`: For updating the vulnerability database.
+  - `grype.anchore.io`: For updating the vulnerability database.
 
 ## Example Usage
 
@@ -38,7 +38,7 @@ parameters:
     default: "current-22.04"
   grype_version:
     type: string
-    default: "0.107.0"
+    default: "0.119.0"
 
 jobs:
   scan_container:
@@ -70,8 +70,8 @@ jobs:
 
 `scan_image` retains its original `image` parameter for backward
 compatibility. New configurations can use the more accurately named `source`
-parameter with any source syntax supported by Grype. Set exactly one of
-`source` or `image`.
+parameter with any source syntax supported by Grype, including `cpes:` files
+and `zarf:` package archives. Set exactly one of `source` or `image`.
 
 ```yaml
 - grype/scan_image:
