@@ -55,6 +55,18 @@ jobs:
       - run:
           name: Verify source/config/only-fixed scan
           command: test -s repository.scan.json
+      # Several report formats rendered from a single scan.
+      - grype-orb/scan_image:
+          source: gcr.io/distroless/base:latest
+          output_formats: json=distroless.base.scan.multi.json,table=distroless.base.scan.multi.txt
+      - run:
+          name: Verify Multiple Report Formats
+          command: |
+            jq -e '.matches | type == "array"' distroless.base.scan.multi.json
+            test -s distroless.base.scan.multi.txt
+            cat distroless.base.scan.multi.txt
+            # Only the requested reports are written, not the single-report default.
+            test ! -e grype-scan-results.sarif
 
 workflows:
   test-deploy:

@@ -94,3 +94,22 @@ policy file to carry ignore rules. Repositories can pair that file with their
 own CI validation for required rationale and expiry metadata. `only_fixed`
 passes `--only-fixed`. The existing `fail_on` parameter remains optional;
 leave it empty to report findings without gating.
+
+## Multiple report formats
+
+`output_formats` renders several reports from a single scan, so every report
+comes from the same cataloging pass and the same vulnerability database
+snapshot. Separate scans could each pick up a database update, and they repeat
+the image pull and cataloging work. List comma-separated `format=path` pairs;
+each becomes its own `-o format=path` flag:
+
+```yaml
+- grype/scan_image:
+    source: sbom:./forge.cdx.json
+    output_formats: json=forge.grype.json,table=forge.grype.txt
+```
+
+`output_formats` cannot be combined with `output_format` or `output_file`.
+Without it, the single-report behavior is unchanged: `output_format` defaults
+to `sarif` and `output_file` to `grype-scan-results.sarif`. When `fail_on`
+trips, every report is still written before the step fails.

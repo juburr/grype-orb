@@ -3,6 +3,7 @@ setup: true
 orbs:
   orb-tools: circleci/orb-tools@12.0
   shellcheck: circleci/shellcheck@3.1
+  bats: circleci/bats@1.1
 
 filters: &filters
   tags:
@@ -19,10 +20,14 @@ workflows:
           filters: *filters
       - shellcheck/check:
           filters: *filters
+      # Offline unit tests for the orb's scripts (tests/*.bats).
+      - bats/run:
+          path: ./tests
+          filters: *filters
       # Triggers the next workflow in the Orb Development Kit.
       - orb-tools/continue:
           pipeline_number: << pipeline.number >>
           vcs_type: << pipeline.project.type >>
           orb_name: grype-orb
-          requires: [orb-tools/lint, orb-tools/pack, orb-tools/review, shellcheck/check]
+          requires: [orb-tools/lint, orb-tools/pack, orb-tools/review, shellcheck/check, bats/run]
           filters: *filters
