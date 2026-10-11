@@ -55,6 +55,39 @@ jobs:
       - run:
           name: Verify source/config/only-fixed scan
           command: test -s repository.scan.json
+      # VEX: the fixture SBOM holds zlib 1.2.11-r3 from Alpine 3.15, an end-of-life
+      # release whose security data no longer changes. It has two known CVEs, and
+      # the OpenVEX fixture marks only the Critical one (CVE-2022-37434) not_affected.
+      - grype-orb/scan_image:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          output_file: vex-baseline.scan.json
+          output_format: json
+      - grype-orb/scan_image:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          vex: tests/fixtures/vex/zlib.openvex.json
+          fail_on: critical
+          output_file: vex-parameter.scan.json
+          output_format: json
+      - grype-orb/scan_image:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          config: tests/fixtures/vex/grype.yaml
+          fail_on: critical
+          output_file: vex-config.scan.json
+          output_format: json
+      - run:
+          name: Verify VEX Filtering
+          command: |
+            # Without VEX the CVE is reported as Critical, so fail_on: critical
+            # would have failed the two VEX scans above had VEX not applied.
+            jq -e 'any(.matches[]; .vulnerability.id == "CVE-2022-37434" and .vulnerability.severity == "Critical")' vex-baseline.scan.json
+            for report in vex-parameter.scan.json vex-config.scan.json; do
+              echo "Checking ${report}"
+              # The VEX'd CVE moved to ignoredMatches...
+              jq -e 'all(.matches[]; .vulnerability.id != "CVE-2022-37434")' "${report}"
+              jq -e 'any(.ignoredMatches[]; .vulnerability.id == "CVE-2022-37434")' "${report}"
+              # ...while the High CVE the statement does not cover is still reported.
+              jq -e 'any(.matches[]; .vulnerability.id == "CVE-2018-25032")' "${report}"
+            done
 
 workflows:
   test-deploy:
