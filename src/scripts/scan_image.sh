@@ -64,14 +64,11 @@ if [[ -n "${OUTPUT_FORMATS}" ]]; then
         echo "ERROR: Install a newer Grype, or use output_format and output_file instead." >&2
         exit 2
     fi
-    # Grype writes every report to its own file, leaving nothing on stdout.
-    STDOUT_FILE=/dev/stdout
 else
     OUTPUT_FORMAT=${OUTPUT_FORMAT:-sarif}
     OUTPUT_FILE=${OUTPUT_FILE:-grype-scan-results.sarif}
     OUTPUT_ARGS=(-o "${OUTPUT_FORMAT}")
     OUTPUT_FILES=("${OUTPUT_FILE}")
-    STDOUT_FILE=${OUTPUT_FILE}
 fi
 
 # Print command arguments for debugging purposes.
@@ -148,7 +145,17 @@ if [[ -n "${VEX}" ]]; then
     fi
 fi
 
+# The single report goes to stdout, redirected to output_file. With
+# output_formats Grype writes every report itself, so its stdout stays the
+# step's own: duplicate it rather than reopening /dev/stdout, which would
+# truncate the step's output when that is a regular file.
+if [[ -n "${OUTPUT_FORMATS}" ]]; then
+    exec 3>&1
+else
+    exec 3> "${OUTPUT_FILE}"
+fi
+
 grype "${SCAN_SOURCE}" "${OUTPUT_ARGS[@]}" --add-cpes-if-none -vv \
-    "${FAIL_ARG[@]}" "${CONFIG_ARG[@]}" "${ONLY_FIXED_ARG[@]}" "${VEX_ARGS[@]}" > "${STDOUT_FILE}"
+    "${FAIL_ARG[@]}" "${CONFIG_ARG[@]}" "${ONLY_FIXED_ARG[@]}" "${VEX_ARGS[@]}" >&3
 
 echo "Wrote scan results to: ${OUTPUT_FILES[*]}"

@@ -131,3 +131,13 @@ output_args() {
     [ "${status}" -eq 0 ]
     [ "$(cat scan.json)" = "stdout-report" ]
 }
+
+@test "output_formats keeps the step's earlier output when stdout is a file" {
+    export PARAM_OUTPUT_FORMATS="json=scan.json"
+
+    bash "${SCRIPTS_DIR}/scan_image.sh" > step.log 2>&1
+
+    grep -q '^Running Grype scan' step.log
+    grep -q '^stdout-report$' step.log
+    [ "$(tr -d '\0' < step.log | wc -c)" -eq "$(wc -c < step.log)" ]
+}
