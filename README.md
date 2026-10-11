@@ -116,6 +116,7 @@ own CI validation for required rationale and expiry metadata. `only_fixed`
 passes `--only-fixed`. The existing `fail_on` parameter remains optional;
 leave it empty to report findings without gating.
 
+
 ## VEX
 
 `vex` takes a comma-separated list of [OpenVEX](https://openvex.dev) documents.
@@ -156,3 +157,29 @@ Behavior verified against Grype 0.119.0, the default version:
   `pkg:apk/alpine/zlib@1.2.11-r3`. For image sources, a product naming the
   image as a `pkg:oci` purl with its digest also applies, with the package
   purl listed as a subcomponent.
+
+## Multiple report formats
+
+`output_formats` renders several reports from a single scan, so every report
+comes from the same cataloging pass and the same vulnerability database
+snapshot. Separate scans could each pick up a database update, and they repeat
+the image pull and cataloging work. List comma-separated `format=path` pairs;
+each becomes its own `-o format=path` flag:
+
+```yaml
+- grype/scan_image:
+    source: sbom:./forge.cdx.json
+    output_formats: json=forge.grype.json,table=forge.grype.txt
+```
+
+`output_formats` requires Grype 0.104.1 or later; the default version
+qualifies. Older releases either lack multiple outputs (before 0.64.0) or can
+write registry credentials into JSON written straight to a file (0.68.0 through
+0.104.0, [GHSA-6gxw-85q2-q646](https://github.com/anchore/grype/security/advisories/GHSA-6gxw-85q2-q646)),
+so the step fails before scanning on them. The single-report style is
+unaffected on any version, because it redirects Grype's stdout to the file.
+
+`output_formats` cannot be combined with `output_format` or `output_file`.
+Without it, the single-report behavior is unchanged: `output_format` defaults
+to `sarif` and `output_file` to `grype-scan-results.sarif`. When `fail_on`
+trips, every report is still written before the step fails.
