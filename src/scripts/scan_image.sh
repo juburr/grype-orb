@@ -34,7 +34,9 @@ fi
 OUTPUT_ARGS=()
 OUTPUT_FILES=()
 if [[ -n "${OUTPUT_FORMATS}" ]]; then
-    IFS=',' read -ra OUTPUT_ENTRIES <<< "${OUTPUT_FORMATS}"
+    # The extra trailing comma stops read from dropping a final empty entry,
+    # so "json=a.json," is rejected like any other malformed entry.
+    IFS=',' read -ra OUTPUT_ENTRIES <<< "${OUTPUT_FORMATS},"
     for OUTPUT_ENTRY in "${OUTPUT_ENTRIES[@]}"; do
         # Trim surrounding whitespace, so "json=a.json, table=b.txt" works.
         OUTPUT_ENTRY="${OUTPUT_ENTRY#"${OUTPUT_ENTRY%%[![:space:]]*}"}"
@@ -48,6 +50,19 @@ if [[ -n "${OUTPUT_FORMATS}" ]]; then
         OUTPUT_ARGS+=(-o "${ENTRY_FORMAT}=${ENTRY_FILE}")
         OUTPUT_FILES+=("${ENTRY_FILE}")
     done
+
+    # Grype only supports several outputs from 0.64.0, and 0.68.0 through
+    # 0.104.0 can write registry credentials into JSON written straight to a
+    # file (GHSA-6gxw-85q2-q646), so require a release with the feature and
+    # the fix. The single-report style below redirects stdout and is unaffected.
+    MIN_OUTPUT_FORMATS_VERSION=0.104.1
+    INSTALLED_GRYPE_VERSION=$(grype version | awk '/^Version:/ { sub(/^v/, "", $2); print $2 }')
+    if [[ ! "${INSTALLED_GRYPE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+        [[ "$(printf '%s\n' "${MIN_OUTPUT_FORMATS_VERSION}" "${INSTALLED_GRYPE_VERSION}" | sort -V | head -n 1)" != "${MIN_OUTPUT_FORMATS_VERSION}" ]]; then
+        echo "ERROR: output_formats requires Grype ${MIN_OUTPUT_FORMATS_VERSION} or later, found: '${INSTALLED_GRYPE_VERSION}'." >&2
+        echo "ERROR: Install a newer Grype, or use output_format and output_file instead." >&2
+        exit 2
+    fi
     # Grype writes every report to its own file, leaving nothing on stdout.
     STDOUT_FILE=/dev/stdout
 else

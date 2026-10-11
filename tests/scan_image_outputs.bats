@@ -1,13 +1,15 @@
 #!/usr/bin/env bats
-# Report output tests for src/scripts/scan_image.sh. A stub grype records its
-# arguments, one per line, and prints a marker report on stdout.
+# Report output tests for src/scripts/scan_image.sh. A stub grype reports
+# FAKE_GRYPE_VERSION for `grype version`; for a scan, it records its arguments,
+# one per line, and prints a marker report on stdout.
 
 setup() {
     load test_helper
     common_setup
 
     GRYPE_ARGS="${BATS_TEST_TMPDIR}/grype.args"
-    stub grype "printf '%s\n' \"\$@\" > '${GRYPE_ARGS}'; echo stdout-report"
+    stub grype "if [[ \"\$1\" == version ]]; then echo \"Version:  \${FAKE_GRYPE_VERSION:-0.119.0}\"; exit 0; fi
+printf '%s\n' \"\$@\" > '${GRYPE_ARGS}'; echo stdout-report"
 
     # Start from the defaults the orb passes for every scan_image parameter.
     local param
@@ -92,7 +94,7 @@ output_args() {
 
 @test "malformed output_formats entries are rejected" {
     local entry
-    for entry in "json" "=scan.json" "json=" "json=scan.json,,table=scan.txt"; do
+    for entry in "json" "=scan.json" "json=" "json=scan.json,,table=scan.txt" "json=scan.json,"; do
         export PARAM_OUTPUT_FORMATS="${entry}"
 
         run bash "${SCRIPTS_DIR}/scan_image.sh"
@@ -101,4 +103,31 @@ output_args() {
         [[ "${output}" == *"ERROR: output_formats entries must be format=path"* ]]
         [ ! -e "${GRYPE_ARGS}" ]
     done
+}
+
+@test "output_formats requires Grype 0.104.1 or later" {
+    export PARAM_OUTPUT_FORMATS="json=scan.json,table=scan.txt"
+    local version
+    for version in 0.63.0 0.104.0 "[not provided]"; do
+        export FAKE_GRYPE_VERSION="${version}"
+
+        run bash "${SCRIPTS_DIR}/scan_image.sh"
+
+        [ "${status}" -ne 0 ]
+        [[ "${output}" == *"ERROR: output_formats requires Grype 0.104.1 or later"* ]]
+        [ ! -e "${GRYPE_ARGS}" ]
+    done
+
+    export FAKE_GRYPE_VERSION=0.104.1
+    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    [ "${status}" -eq 0 ]
+}
+
+@test "the single-report style works with older Grype releases" {
+    export FAKE_GRYPE_VERSION=0.50.0 PARAM_OUTPUT_FORMAT=json PARAM_OUTPUT_FILE=scan.json
+
+    run bash "${SCRIPTS_DIR}/scan_image.sh"
+
+    [ "${status}" -eq 0 ]
+    [ "$(cat scan.json)" = "stdout-report" ]
 }

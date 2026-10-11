@@ -109,6 +109,13 @@ each becomes its own `-o format=path` flag:
     output_formats: json=forge.grype.json,table=forge.grype.txt
 ```
 
+`output_formats` requires Grype 0.104.1 or later; the default version
+qualifies. Older releases either lack multiple outputs (before 0.64.0) or can
+write registry credentials into JSON written straight to a file (0.68.0 through
+0.104.0, [GHSA-6gxw-85q2-q646](https://github.com/anchore/grype/security/advisories/GHSA-6gxw-85q2-q646)),
+so the step fails before scanning on them. The single-report style is
+unaffected on any version, because it redirects Grype's stdout to the file.
+
 `output_formats` cannot be combined with `output_format` or `output_file`.
 Without it, the single-report behavior is unchanged: `output_format` defaults
 to `sarif` and `output_file` to `grype-scan-results.sarif`. When `fail_on`
