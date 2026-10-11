@@ -14,7 +14,7 @@ welcome!
 ## Features
 ### **Secure By Design**
 - **Least Privilege**: Installs to a user-owned directory by default, with no `sudo` usage anywhere in this orb.
-- **Integrity**: Checksum validation of all downloaded binaries using SHA-512.
+- **Integrity**: Checksum validation of all downloaded binaries using SHA-512, failing closed by default when a version's checksum is unknown (see [Checksum verification](#checksum-verification)).
 - **Provenance**: Installs directly from Grype's official [releases page](https://github.com/anchore/grype/releases/) on GitHub. No third-party websites, domains, or proxies are used.
 - **Confidentiality**: All secrets and environment variables are handled in accordance with CircleCI's [security recommendations](https://circleci.com/docs/security-recommendations/) and [best practices](https://circleci.com/docs/orbs-best-practices/).
 - **Privacy**: No usage data of any kind is collected or shipped back to the orb developer.
@@ -69,6 +69,22 @@ jobs:
           name: Log Scan Results
           command: cat gcr.distroless.base.grype.sarif
 ```
+
+## Checksum verification
+
+`install` verifies the SHA-512 checksum of the Grype binary against a lookup
+table maintained in this orb. The `verify_checksums` parameter controls what
+happens when the requested `version` is missing from that table:
+
+| Value | Listed version | Unlisted version |
+| --- | --- | --- |
+| `strict` (default) | Verified | Fails before downloading anything |
+| `known_versions` | Verified | Installed unverified, with a warning |
+| `"false"` | Not verified | Not verified (not recommended) |
+
+If you pin a Grype release newer than this orb knows about, upgrade the orb or
+contribute the checksum; set `verify_checksums: known_versions` only as a
+temporary opt-out.
 
 ## Scan sources and policy
 
