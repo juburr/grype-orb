@@ -77,16 +77,18 @@ if [[ -n "${VEX}" ]]; then
     # --vex replaces vex-documents from Grype's config instead of merging with
     # it, so documents listed only in the config would silently stop applying.
     # Grype reads the named config file, or else every config file it finds in
-    # its search paths, so check the same files.
+    # its search paths, so check the same YAML files.
     if [[ -n "${CONFIG}" ]]; then
         CONFIG_FILES=("${CONFIG}")
     elif [[ -n "${GRYPE_CONFIG:-}" ]]; then
         CONFIG_FILES=("${GRYPE_CONFIG}")
     else
-        XDG_GRYPE_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/grype"
         CONFIG_FILES=(.grype.yaml .grype.yml .grype/config.yaml .grype/config.yml
-            "${HOME}/.grype.yaml" "${HOME}/.grype.yml"
-            "${XDG_GRYPE_DIR}/config.yaml" "${XDG_GRYPE_DIR}/config.yml")
+            "${HOME}/.grype.yaml" "${HOME}/.grype.yml")
+        IFS=':' read -ra XDG_DIRS <<< "${XDG_CONFIG_HOME:-${HOME}/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+        for XDG_DIR in "${XDG_DIRS[@]}"; do
+            CONFIG_FILES+=("${XDG_DIR}/grype/config.yaml" "${XDG_DIR}/grype/config.yml")
+        done
     fi
     for CONFIG_FILE in "${CONFIG_FILES[@]}"; do
         if grep -qE '^vex-documents:' "${CONFIG_FILE}" 2>/dev/null; then

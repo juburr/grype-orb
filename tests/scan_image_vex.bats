@@ -20,6 +20,7 @@ setup() {
     export HOME="${BATS_TEST_TMPDIR}/home"
     mkdir -p "${HOME}"
     unset XDG_CONFIG_HOME GRYPE_CONFIG
+    export XDG_CONFIG_DIRS="${BATS_TEST_TMPDIR}/xdg"
     printf '{}\n' > b.openvex.json
 }
 
@@ -107,9 +108,10 @@ vex_args() {
 }
 
 @test "vex warns when an auto-discovered config file lists vex-documents" {
-    mkdir -p .grype "${HOME}/.config/grype"
+    mkdir -p .grype "${HOME}/.config/grype" "${XDG_CONFIG_DIRS}/grype"
     printf 'vex-documents:\n  - b.openvex.json\n' > .grype/config.yaml
     printf 'vex-documents:\n  - b.openvex.json\n' > "${HOME}/.config/grype/config.yaml"
+    printf 'vex-documents:\n  - b.openvex.json\n' > "${XDG_CONFIG_DIRS}/grype/config.yml"
     export PARAM_VEX=a.openvex.json
 
     run bash "${SCRIPTS_DIR}/scan_image.sh"
@@ -117,6 +119,7 @@ vex_args() {
     [ "${status}" -eq 0 ]
     [[ "${output}" == *"WARN: .grype/config.yaml sets vex-documents"* ]]
     [[ "${output}" == *"WARN: ${HOME}/.config/grype/config.yaml sets vex-documents"* ]]
+    [[ "${output}" == *"WARN: ${XDG_CONFIG_DIRS}/grype/config.yml sets vex-documents"* ]]
 }
 
 @test "an explicit config file stops auto-discovered files from warning" {
