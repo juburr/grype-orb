@@ -42,7 +42,8 @@ cp '${FAKE_TARBALL}' \"\${out}\""
     run bash "${SCRIPTS_DIR}/install.sh"
 
     [ "${status}" -ne 0 ]
-    [[ "${output}" == *"No checksum available for version ${UNLISTED_VERSION} and strict mode is enabled."* ]]
+    [[ "${output}" == *"No checksum available for version ${UNLISTED_VERSION}"* ]]
+    [[ "${output}" == *"strict mode is enabled"* ]]
     [ ! -e "${DOWNLOAD_LOG}" ]
     [ ! -e "${INSTALL_DIR}/grype" ]
 }
