@@ -1,0 +1,22 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/juburr/grype-orb/tests/fixtures/vex/zlib.openvex.json",
+  "author": "grype-orb test fixture",
+  "timestamp": "2026-10-11T00:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2022-37434"
+      },
+      "products": [
+        {
+          "@id": "pkg:apk/alpine/zlib@1.2.11-r3"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Test fixture only: inflateGetHeader() is never called."
+    }
+  ]
+}
