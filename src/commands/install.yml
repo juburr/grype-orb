@@ -12,8 +12,13 @@ parameters:
   verify_checksums:
     type: enum
     enum: ["false", "known_versions", "strict"]
-    default: known_versions
-    description: Option to perform SHA-512 checksum verification on the downloaded Grype executable.
+    default: strict
+    description: >
+      SHA-512 checksum verification of the downloaded Grype executable.
+      "strict" (the default) fails before downloading when this orb has no
+      checksum for the requested version. "known_versions" verifies listed
+      versions but installs unlisted versions unverified, with a warning.
+      "false" disables verification and is not recommended.
   version:
     type: string
     default: "0.119.0"

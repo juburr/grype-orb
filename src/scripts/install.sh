@@ -4,7 +4,7 @@ set -e
 
 # Read in orb parameters
 INSTALL_PATH=$(circleci env subst "${PARAM_INSTALL_PATH}")
-VERIFY_CHECKSUMS="${PARAM_VERIFY_CHECKSUMS}"
+VERIFY_CHECKSUMS="${PARAM_VERIFY_CHECKSUMS:-strict}"
 VERSION=$(circleci env subst "${PARAM_VERSION}")
 
 # Grype publishes a Linux release asset per CPU architecture. Map this
@@ -434,6 +434,21 @@ verify_checksum() {
     echo "Checksum verification passed!"
 }
 
+# A version missing from the lookup table means a new version of Grype was
+# released but this orb hasn't been updated yet to include its checksum. Unless
+# developers opt out with "known_versions" or "false", fail before downloading
+# or extracting anything that could not be verified.
+if [[ "${ARCH}" == "arm64" ]]; then
+    EXPECTED_CHECKSUM=${sha512sums_arm64[${VERSION}]}
+else
+    EXPECTED_CHECKSUM=${sha512sums_amd64[${VERSION}]}
+fi
+if [[ -z "${EXPECTED_CHECKSUM}" && "${VERIFY_CHECKSUMS}" != "known_versions" && "${VERIFY_CHECKSUMS}" != "false" ]]; then
+    echo "ERROR: No checksum available for version ${VERSION} (${ARCH}) and strict mode is enabled."
+    echo "ERROR: Either upgrade this orb, submit a PR with the new checksum, or set 'verify_checksums' to 'known_versions'."
+    exit 1
+fi
+
 # Check if the grype tar file was in the CircleCI cache.
 # Cache restoration is handled in install.yml
 if [[ -f grype.tar.gz ]]; then
@@ -456,33 +471,17 @@ fi
 
 # A grype binary should exist at this point, regardless of whether it was obtained
 # through cache or re-downloaded. First verify its integrity.
-if [[ "${VERIFY_CHECKSUMS}" != "false" ]]; then
-    if [[ "${ARCH}" == "arm64" ]]; then
-        EXPECTED_CHECKSUM=${sha512sums_arm64[${VERSION}]}
-    else
-        EXPECTED_CHECKSUM=${sha512sums_amd64[${VERSION}]}
-    fi
-    if [[ -n "${EXPECTED_CHECKSUM}" ]]; then
-        # If the version is in the table, verify the checksum
-        verify_checksum "grype" "${EXPECTED_CHECKSUM}"
-    else
-        # If the version is not in the table, this means that a new version of Cosign
-        # was released but this orb hasn't been updated yet to include its checksum in
-        # the lookup table. Allow developers to configure if they want this to result in
-        # a hard error, via "strict mode" (recommended), or to allow execution for versions
-        # not directly specified in the above lookup table.
-        if [[ "${VERIFY_CHECKSUMS}" == "known_versions" ]]; then
-            echo "WARN: No checksum available for version ${VERSION} (${ARCH}), but strict mode is not enabled."
-            echo "WARN: Either upgrade this orb, submit a PR with the new checksum."
-            echo "WARN: Skipping checksum verification..."
-        else
-            echo "ERROR: No checksum available for version ${VERSION} (${ARCH}) and strict mode is enabled."
-            echo "ERROR: Either upgrade this orb, submit a PR with the new checksum, or set 'verify_checksums' to 'known_versions'."
-            exit 1
-        fi
-    fi
-else
+if [[ "${VERIFY_CHECKSUMS}" == "false" ]]; then
     echo "WARN: Checksum validation is disabled. This is not recommended. Skipping..."
+elif [[ -n "${EXPECTED_CHECKSUM}" ]]; then
+    # If the version is in the table, verify the checksum
+    verify_checksum "grype" "${EXPECTED_CHECKSUM}"
+else
+    # Only reachable with "known_versions"; every other mode exits before the
+    # download when the version is missing from the lookup table.
+    echo "WARN: No checksum available for version ${VERSION} (${ARCH}), but strict mode is not enabled."
+    echo "WARN: Either upgrade this orb or submit a PR with the new checksum."
+    echo "WARN: Skipping checksum verification..."
 fi
 
 # After verifying integrity, install it by moving it to
