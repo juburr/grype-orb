@@ -1,13 +1,25 @@
 #!/usr/bin/env bats
-# VEX parameter tests for src/scripts/scan_image.sh. A stub grype records its
-# arguments, one per line, so the tests can check how parameters are mapped.
+# VEX parameter tests for src/scripts/scan_image.sh. A stub grype records the
+# arguments of a scan, one per line, so the tests can check how parameters are
+# mapped. For `grype config --load` it records those arguments separately and
+# prints GRYPE_CONFIG_DUMP, modelled on Grype's real output, or fails when that
+# file is missing, as Grype releases before 0.78.0 do.
 
 setup() {
     load test_helper
     common_setup
 
     GRYPE_ARGS="${BATS_TEST_TMPDIR}/grype.args"
-    stub grype "printf '%s\n' \"\$@\" > '${GRYPE_ARGS}'"
+    GRYPE_CONFIG_ARGS="${BATS_TEST_TMPDIR}/grype-config.args"
+    GRYPE_CONFIG_DUMP="${BATS_TEST_TMPDIR}/grype-config.yaml"
+    stub grype "if [[ \"\$1 \$2\" == 'config --load' ]]; then
+    printf '%s\n' \"\$@\" > '${GRYPE_CONFIG_ARGS}'
+    [[ -f '${GRYPE_CONFIG_DUMP}' ]] || exit 1
+    cat '${GRYPE_CONFIG_DUMP}'
+    exit 0
+fi
+printf '%s\n' \"\$@\" > '${GRYPE_ARGS}'"
+    config_dump 'vex-documents: []'
 
     # Start from the defaults the orb passes for every scan_image parameter.
     local param
@@ -16,12 +28,18 @@ setup() {
     done
     export PARAM_SOURCE="sbom:./sbom.json"
     printf '{}\n' > a.openvex.json
-    # Keep Grype's home and XDG config search paths inside the test.
-    export HOME="${BATS_TEST_TMPDIR}/home"
-    mkdir -p "${HOME}"
-    unset XDG_CONFIG_HOME GRYPE_CONFIG
-    export XDG_CONFIG_DIRS="${BATS_TEST_TMPDIR}/xdg"
     printf '{}\n' > b.openvex.json
+}
+
+# config_dump LINES...: sets what the stub's `grype config --load` prints for
+# the vex-documents setting, between the neighbouring keys Grype prints.
+config_dump() {
+    {
+        printf 'from: []\n\n'
+        printf '# a list of VEX documents to consider when producing scanning results (env: GRYPE_VEX_DOCUMENTS)\n'
+        printf '%s\n' "$@"
+        printf '\n# VEX statuses to consider as ignored rules (env: GRYPE_VEX_ADD)\nvex-add: []\n'
+    } > "${GRYPE_CONFIG_DUMP}"
 }
 
 # vex_args: prints the --vex values grype received, one per line.
@@ -86,68 +104,45 @@ vex_args() {
     [ ! -e "${GRYPE_ARGS}" ]
 }
 
-@test "vex warns when the config file also lists vex-documents" {
-    printf 'vex-documents:\n  - b.openvex.json\n' > grype.yaml
+@test "vex warns when Grype's configuration lists vex-documents" {
+    config_dump 'vex-documents:' "  - 'b.openvex.json'" "  - 'policy/c.openvex.json'"
     export PARAM_CONFIG=grype.yaml PARAM_VEX=a.openvex.json
 
     run bash "${SCRIPTS_DIR}/scan_image.sh"
 
     [ "${status}" -eq 0 ]
-    [[ "${output}" == *"WARN: grype.yaml sets vex-documents"* ]]
+    [[ "${output}" == *"WARN: Grype's configuration lists vex-documents (b.openvex.json, policy/c.openvex.json)"* ]]
+    [ "$(cat "${GRYPE_CONFIG_ARGS}")" = "$(printf 'config\n--load\n--config\ngrype.yaml')" ]
     [ "$(vex_args)" = "a.openvex.json" ]
 }
 
-@test "a config file with vex-documents alone does not warn" {
-    printf 'vex-documents:\n  - b.openvex.json\n' > grype.yaml
-    export PARAM_CONFIG=grype.yaml
-
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
-
-    [ "${status}" -eq 0 ]
-    [[ "${output}" != *"WARN"* ]]
-}
-
-@test "vex warns when an auto-discovered config file lists vex-documents" {
-    mkdir -p .grype "${HOME}/.config/grype" "${XDG_CONFIG_DIRS}/grype"
-    printf 'vex-documents:\n  - b.openvex.json\n' > .grype/config.yaml
-    printf 'vex-documents:\n  - b.openvex.json\n' > "${HOME}/.config/grype/config.yaml"
-    printf 'vex-documents:\n  - b.openvex.json\n' > "${XDG_CONFIG_DIRS}/grype/config.yml"
+@test "vex does not warn when Grype's configuration lists no vex-documents" {
     export PARAM_VEX=a.openvex.json
 
     run bash "${SCRIPTS_DIR}/scan_image.sh"
 
     [ "${status}" -eq 0 ]
-    [[ "${output}" == *"WARN: .grype/config.yaml sets vex-documents"* ]]
-    [[ "${output}" == *"WARN: ${HOME}/.config/grype/config.yaml sets vex-documents"* ]]
-    [[ "${output}" == *"WARN: ${XDG_CONFIG_DIRS}/grype/config.yml sets vex-documents"* ]]
+    [[ "${output}" != *"WARN"* ]]
+    [ "$(cat "${GRYPE_CONFIG_ARGS}")" = "$(printf 'config\n--load')" ]
 }
 
-@test "an explicit config file stops auto-discovered files from warning" {
-    printf 'vex-documents:\n  - b.openvex.json\n' > .grype.yaml
-    printf 'only-fixed: true\n' > grype.yaml
-    export PARAM_CONFIG=grype.yaml PARAM_VEX=a.openvex.json
+@test "without vex, Grype's configuration is not queried" {
+    config_dump 'vex-documents:' "  - 'b.openvex.json'"
 
     run bash "${SCRIPTS_DIR}/scan_image.sh"
 
     [ "${status}" -eq 0 ]
     [[ "${output}" != *"WARN"* ]]
+    [ ! -e "${GRYPE_CONFIG_ARGS}" ]
 }
 
-@test "vex warns for other YAML spellings of vex-documents, but not for comments" {
-    export PARAM_CONFIG=grype.yaml PARAM_VEX=a.openvex.json
-    local spelling
-    for spelling in 'vex-documents : [b.openvex.json]' '"vex-documents": [b.openvex.json]' \
-        "'vex-documents': [b.openvex.json]" '{vex-documents: [b.openvex.json]}'; do
-        printf '%s\n' "${spelling}" > grype.yaml
+@test "vex notes the replacement when Grype cannot report its configuration" {
+    rm "${GRYPE_CONFIG_DUMP}"
+    export PARAM_VEX=a.openvex.json
 
-        run bash "${SCRIPTS_DIR}/scan_image.sh"
-
-        [ "${status}" -eq 0 ]
-        [[ "${output}" == *"WARN: grype.yaml sets vex-documents"* ]]
-    done
-
-    printf '# vex-documents: [b.openvex.json]\nonly-fixed: true # vex-documents: [b.openvex.json]\n' > grype.yaml
     run bash "${SCRIPTS_DIR}/scan_image.sh"
+
     [ "${status}" -eq 0 ]
-    [[ "${output}" != *"WARN"* ]]
+    [[ "${output}" == *"WARN: Could not read Grype's configuration (grype config --load needs Grype 0.78.0 or later)."* ]]
+    [ "$(vex_args)" = "a.openvex.json" ]
 }

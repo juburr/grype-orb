@@ -74,30 +74,26 @@ if [[ -n "${VEX}" ]]; then
         VEX_ARGS+=(--vex "${VEX_DOCUMENT}")
     done
 
-    # --vex replaces vex-documents from Grype's config instead of merging with
-    # it, so documents listed only in the config would silently stop applying.
-    # Grype reads the named config file, or else every config file it finds in
-    # its search paths, so check the same YAML files.
-    if [[ -n "${CONFIG}" ]]; then
-        CONFIG_FILES=("${CONFIG}")
-    elif [[ -n "${GRYPE_CONFIG:-}" ]]; then
-        CONFIG_FILES=("${GRYPE_CONFIG}")
-    else
-        CONFIG_FILES=(.grype.yaml .grype.yml .grype/config.yaml .grype/config.yml
-            "${HOME}/.grype.yaml" "${HOME}/.grype.yml")
-        IFS=':' read -ra XDG_DIRS <<< "${XDG_CONFIG_HOME:-${HOME}/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
-        for XDG_DIR in "${XDG_DIRS[@]}"; do
-            CONFIG_FILES+=("${XDG_DIR}/grype/config.yaml" "${XDG_DIR}/grype/config.yml")
-        done
-    fi
-    for CONFIG_FILE in "${CONFIG_FILES[@]}"; do
-        # Without a YAML parser, match the key loosely: any uncommented mention,
-        # quoted or not, also covers "key :" spacing and inline flow mappings.
-        if grep -qE "^[^#]*vex-documents[\"']?[[:space:]]*:" "${CONFIG_FILE}" 2>/dev/null; then
-            echo "WARN: ${CONFIG_FILE} sets vex-documents, which Grype ignores when the vex parameter is set." >&2
+    # --vex replaces the vex-documents in Grype's configuration instead of
+    # merging with them, so documents listed only there would silently stop
+    # applying. Ask Grype for its resolved configuration rather than parsing
+    # YAML here: that covers the config file, Grype's search paths and
+    # GRYPE_VEX_DOCUMENTS, in any valid spelling.
+    if CONFIG_DUMP=$(grype config --load "${CONFIG_ARG[@]}" 2>/dev/null); then
+        CONFIGURED_VEX=$(awk '
+            /^vex-documents:/ { found = 1; sub(/^vex-documents:[[:space:]]*/, ""); if ($0 != "[]") docs = $0; next }
+            found && /^[[:space:]]+- / { sub(/^[[:space:]]+- /, ""); docs = docs (docs == "" ? "" : ", ") $0; next }
+            found && !/^[[:space:]]*$/ { exit }
+            END { gsub(/["\047]/, "", docs); print docs }
+        ' <<< "${CONFIG_DUMP}")
+        if [[ -n "${CONFIGURED_VEX}" ]]; then
+            echo "WARN: Grype's configuration lists vex-documents (${CONFIGURED_VEX}), which the vex parameter replaces rather than adds to." >&2
             echo "WARN: List every VEX document in either the vex parameter or the config file." >&2
         fi
-    done
+    else
+        echo "WARN: Could not read Grype's configuration (grype config --load needs Grype 0.78.0 or later)." >&2
+        echo "WARN: Note that the vex parameter replaces any vex-documents listed there rather than adding to them." >&2
+    fi
 fi
 
 grype "${SCAN_SOURCE}" -o "${OUTPUT_FORMAT}" --add-cpes-if-none -vv \
