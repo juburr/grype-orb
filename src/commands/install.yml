@@ -1,4 +1,6 @@
-description: Installs the grype binary. This command should be invoked prior to calling any other commands.
+description: >
+  Installs the grype binary for the machine's architecture (Linux amd64 or arm64).
+  This command should be invoked prior to calling any other commands.
 parameters:
   caching:
     type: boolean
@@ -21,7 +23,7 @@ steps:
       condition: << parameters.caching >>
       steps:
         - restore_cache:
-            key: grype-cache-<< parameters.version >>
+            key: grype-cache-v2-{{ arch }}-<< parameters.version >>
   - run:
       name: Install Grype
       environment:
@@ -33,7 +35,7 @@ steps:
       condition: << parameters.caching >>
       steps:
         - save_cache:
-            key: grype-cache-<< parameters.version >>
+            key: grype-cache-v2-{{ arch }}-<< parameters.version >>
             paths:
               - grype.tar.gz
   - run:
