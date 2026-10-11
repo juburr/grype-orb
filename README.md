@@ -19,6 +19,11 @@ welcome!
 - **Confidentiality**: All secrets and environment variables are handled in accordance with CircleCI's [security recommendations](https://circleci.com/docs/security-recommendations/) and [best practices](https://circleci.com/docs/orbs-best-practices/).
 - **Privacy**: No usage data of any kind is collected or shipped back to the orb developer.
 
+### **Platforms**
+- Linux `amd64` (`x86_64`) and `arm64` (`aarch64`), on Docker or machine executors, including CircleCI's Arm resource classes. `install` detects the architecture with `uname -m`, downloads the matching Grype release, and verifies it against a per-architecture checksum table. Any other platform is a hard error.
+- The binary cache key includes the architecture, so amd64 and arm64 jobs never share a cached download.
+- If `install_path` is not on `PATH` (as can happen on machine executors), `install` creates it and adds it to `PATH` for the job's later steps.
+
 Info for security teams:
 - Required external access to allow, if running a locked down, self-hosted CircleCI pipeline on-prem:
   - `github.com`: For download and installation of the Grype tool.
