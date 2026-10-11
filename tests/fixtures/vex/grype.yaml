@@ -1,0 +1,5 @@
+# Grype configuration fixture: loads the OpenVEX fixture through the config
+# file instead of --vex. Grype resolves the path against the working
+# directory (the repository root in CI), not against this file.
+vex-documents:
+  - tests/fixtures/vex/zlib.openvex.json

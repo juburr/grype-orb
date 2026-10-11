@@ -27,6 +27,15 @@ parameters:
     type: boolean
     default: false
     description: When true, report only vulnerabilities that have a fix.
+  vex:
+    type: string
+    default: ""
+    description: >
+      Optional comma-separated list of OpenVEX document paths, each passed to
+      Grype as its own --vex flag. A path that does not exist fails the step.
+      Matches marked not_affected or fixed are moved to ignoredMatches and do
+      not count toward fail_on. When set, these documents replace (rather
+      than add to) any vex-documents listed in the config file.
   output_format:
     type: enum
     enum: ["", "json", "table", "cyclonedx", "cyclonedx-json", "sarif", "template"]
@@ -62,4 +71,5 @@ steps:
         PARAM_OUTPUT_FORMAT: << parameters.output_format >>
         PARAM_OUTPUT_FORMATS: << parameters.output_formats >>
         PARAM_SOURCE: << parameters.source >>
+        PARAM_VEX: << parameters.vex >>
       command: << include(scripts/scan_image.sh) >>
