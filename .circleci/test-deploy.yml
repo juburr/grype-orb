@@ -34,6 +34,7 @@ jobs:
           command: |
             command -v grype
             grype version
+            grype version | grep -E '^Platform:[[:space:]]+linux/amd64$'
       - grype-orb/log_version
       - grype-orb/update_database
       - grype-orb/scan_image:
@@ -94,12 +95,39 @@ jobs:
               jq -e 'any(.matches[]; .vulnerability.id == "CVE-2018-25032")' "${report}"
             done
 
+  # Runs the orb natively on an Arm machine executor, with default parameters.
+  command-test-arm64:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: arm.medium
+    steps:
+      - checkout
+      - grype-orb/install
+      - run:
+          name: Verify Native arm64 Install
+          command: |
+            echo "PATH=${PATH}"
+            command -v grype
+            grype version
+            grype version | grep -E '^Platform:[[:space:]]+linux/arm64$'
+      - grype-orb/log_version
+      - grype-orb/update_database
+      - grype-orb/scan_image:
+          source: dir:.
+          output_file: repository.arm64.scan.json
+          output_format: json
+      - run:
+          name: Verify arm64 Scan
+          command: test -s repository.arm64.scan.json
+
 workflows:
   test-deploy:
     jobs:
       # Make sure to include "filters: *filters" in every test job you want to run as part of your deployment.
       # Test your orb's commands in a custom job and test your orb's jobs directly as a part of this workflow.
       - command-test:
+          filters: *filters
+      - command-test-arm64:
           filters: *filters
       # The orb must be re-packed for publishing, and saved to the workspace.
       - orb-tools/pack:
@@ -112,5 +140,6 @@ workflows:
           requires:
             - orb-tools/pack
             - command-test
+            - command-test-arm64
           context: orb-publishing
           filters: *release-filters
