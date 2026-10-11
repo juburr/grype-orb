@@ -60,7 +60,9 @@ esac
 # as its own flag, and fail early on a path that does not exist.
 VEX_ARGS=()
 if [[ -n "${VEX}" ]]; then
-    IFS=',' read -ra VEX_DOCUMENTS <<< "${VEX}"
+    # The extra trailing comma stops read from dropping a final empty entry,
+    # so "a.json," is rejected like any other empty entry.
+    IFS=',' read -ra VEX_DOCUMENTS <<< "${VEX},"
     for VEX_DOCUMENT in "${VEX_DOCUMENTS[@]}"; do
         # Trim surrounding whitespace, so "a.json, b.json" works.
         VEX_DOCUMENT="${VEX_DOCUMENT#"${VEX_DOCUMENT%%[![:space:]]*}"}"
@@ -72,12 +74,26 @@ if [[ -n "${VEX}" ]]; then
         VEX_ARGS+=(--vex "${VEX_DOCUMENT}")
     done
 
-    # --vex replaces the config file's vex-documents instead of merging with
+    # --vex replaces vex-documents from Grype's config instead of merging with
     # it, so documents listed only in the config would silently stop applying.
-    if [[ -n "${CONFIG}" ]] && grep -qE '^vex-documents:' "${CONFIG}" 2>/dev/null; then
-        echo "WARN: ${CONFIG} sets vex-documents, which Grype ignores when the vex parameter is set." >&2
-        echo "WARN: List every VEX document in either the vex parameter or the config file." >&2
+    # Grype reads the named config file, or else every config file it finds in
+    # its search paths, so check the same files.
+    if [[ -n "${CONFIG}" ]]; then
+        CONFIG_FILES=("${CONFIG}")
+    elif [[ -n "${GRYPE_CONFIG:-}" ]]; then
+        CONFIG_FILES=("${GRYPE_CONFIG}")
+    else
+        XDG_GRYPE_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/grype"
+        CONFIG_FILES=(.grype.yaml .grype.yml .grype/config.yaml .grype/config.yml
+            "${HOME}/.grype.yaml" "${HOME}/.grype.yml"
+            "${XDG_GRYPE_DIR}/config.yaml" "${XDG_GRYPE_DIR}/config.yml")
     fi
+    for CONFIG_FILE in "${CONFIG_FILES[@]}"; do
+        if grep -qE '^vex-documents:' "${CONFIG_FILE}" 2>/dev/null; then
+            echo "WARN: ${CONFIG_FILE} sets vex-documents, which Grype ignores when the vex parameter is set." >&2
+            echo "WARN: List every VEX document in either the vex parameter or the config file." >&2
+        fi
+    done
 fi
 
 grype "${SCAN_SOURCE}" -o "${OUTPUT_FORMAT}" --add-cpes-if-none -vv \

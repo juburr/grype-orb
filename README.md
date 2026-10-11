@@ -119,9 +119,11 @@ Behavior verified against Grype 0.119.0, the default version:
 - **Config file.** A config file's `vex-documents` key also works. Relative
   paths in it resolve against the working directory, not the config file's
   location.
-- **`vex` replaces `vex-documents`.** Grype does not merge the two lists: when
-  `vex` is set, documents listed only in the config file stop applying (the
-  orb prints a warning). Keep every document in one of the two places.
+- **`vex` replaces `vex-documents`.** Grype does not merge the two lists. When
+  `vex` is set, documents listed only in a config file stop applying, whether
+  that is the file named by `config` or one Grype loads on its own (such as
+  `./.grype.yaml`). The orb prints a warning when it finds this. Keep every
+  document in one of the two places.
 - **Vulnerability IDs.** A statement must name the ID Grype reports. OS
   packages are reported by CVE, but most language packages are reported by
   GitHub advisory (for example `GHSA-xvch-5gv4-984h` rather than

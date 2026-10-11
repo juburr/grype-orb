@@ -16,6 +16,10 @@ setup() {
     done
     export PARAM_SOURCE="sbom:./sbom.json"
     printf '{}\n' > a.openvex.json
+    # Keep Grype's home and XDG config search paths inside the test.
+    export HOME="${BATS_TEST_TMPDIR}/home"
+    mkdir -p "${HOME}"
+    unset XDG_CONFIG_HOME GRYPE_CONFIG
     printf '{}\n' > b.openvex.json
 }
 
@@ -71,6 +75,16 @@ vex_args() {
     [ ! -e "${GRYPE_ARGS}" ]
 }
 
+@test "a trailing comma in the VEX list fails before scanning" {
+    export PARAM_VEX="a.openvex.json,"
+
+    run bash "${SCRIPTS_DIR}/scan_image.sh"
+
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"ERROR: VEX document not found: ''"* ]]
+    [ ! -e "${GRYPE_ARGS}" ]
+}
+
 @test "vex warns when the config file also lists vex-documents" {
     printf 'vex-documents:\n  - b.openvex.json\n' > grype.yaml
     export PARAM_CONFIG=grype.yaml PARAM_VEX=a.openvex.json
@@ -85,6 +99,30 @@ vex_args() {
 @test "a config file with vex-documents alone does not warn" {
     printf 'vex-documents:\n  - b.openvex.json\n' > grype.yaml
     export PARAM_CONFIG=grype.yaml
+
+    run bash "${SCRIPTS_DIR}/scan_image.sh"
+
+    [ "${status}" -eq 0 ]
+    [[ "${output}" != *"WARN"* ]]
+}
+
+@test "vex warns when an auto-discovered config file lists vex-documents" {
+    mkdir -p .grype "${HOME}/.config/grype"
+    printf 'vex-documents:\n  - b.openvex.json\n' > .grype/config.yaml
+    printf 'vex-documents:\n  - b.openvex.json\n' > "${HOME}/.config/grype/config.yaml"
+    export PARAM_VEX=a.openvex.json
+
+    run bash "${SCRIPTS_DIR}/scan_image.sh"
+
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"WARN: .grype/config.yaml sets vex-documents"* ]]
+    [[ "${output}" == *"WARN: ${HOME}/.config/grype/config.yaml sets vex-documents"* ]]
+}
+
+@test "an explicit config file stops auto-discovered files from warning" {
+    printf 'vex-documents:\n  - b.openvex.json\n' > .grype.yaml
+    printf 'only-fixed: true\n' > grype.yaml
+    export PARAM_CONFIG=grype.yaml PARAM_VEX=a.openvex.json
 
     run bash "${SCRIPTS_DIR}/scan_image.sh"
 
