@@ -56,6 +56,44 @@ jobs:
       - run:
           name: Verify source/config/only-fixed scan
           command: test -s repository.scan.json
+      # VEX: the fixture SBOM holds zlib 1.2.11-r3 from Alpine 3.15, an end-of-life
+      # release whose security data no longer changes. Its explicit placeholder CPE
+      # keeps NVD's CPE data (which does change) out of the matches, leaving two
+      # CVEs. The OpenVEX fixture marks only the Critical one (CVE-2022-37434)
+      # not_affected.
+      - grype-orb/scan_image:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          output_file: vex-baseline.scan.json
+          output_format: json
+      - run:
+          name: Verify VEX Fixture Baseline
+          command: |
+            # Without VEX, CVE-2022-37434 must be the fixture's only Critical, so
+            # the fail_on: critical scans below test exactly that one match.
+            jq -e '[.matches[] | select(.vulnerability.severity == "Critical") | .vulnerability.id] == ["CVE-2022-37434"]' vex-baseline.scan.json
+      - grype-orb/scan_image:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          vex: tests/fixtures/vex/zlib.openvex.json
+          fail_on: critical
+          output_file: vex-parameter.scan.json
+          output_format: json
+      - grype-orb/scan_image:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          config: tests/fixtures/vex/grype.yaml
+          fail_on: critical
+          output_file: vex-config.scan.json
+          output_format: json
+      - run:
+          name: Verify VEX Filtering
+          command: |
+            for report in vex-parameter.scan.json vex-config.scan.json; do
+              echo "Checking ${report}"
+              # The VEX'd CVE moved to ignoredMatches...
+              jq -e 'all(.matches[]; .vulnerability.id != "CVE-2022-37434")' "${report}"
+              jq -e 'any(.ignoredMatches[]; .vulnerability.id == "CVE-2022-37434")' "${report}"
+              # ...while the High CVE the statement does not cover is still reported.
+              jq -e 'any(.matches[]; .vulnerability.id == "CVE-2018-25032")' "${report}"
+            done
 
   # Runs the orb natively on an Arm machine executor, with default parameters.
   command-test-arm64:

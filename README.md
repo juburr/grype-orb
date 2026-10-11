@@ -115,3 +115,44 @@ policy file to carry ignore rules. Repositories can pair that file with their
 own CI validation for required rationale and expiry metadata. `only_fixed`
 passes `--only-fixed`. The existing `fail_on` parameter remains optional;
 leave it empty to report findings without gating.
+
+## VEX
+
+`vex` takes a comma-separated list of [OpenVEX](https://openvex.dev) documents.
+Each path is passed to Grype as its own `--vex` flag, and a path that does not
+exist fails the step before scanning. Matches that a document marks
+`not_affected` or `fixed` move to `ignoredMatches` in JSON output and do not
+count toward `fail_on`. `affected` and `under_investigation` statements filter
+nothing.
+
+```yaml
+- grype/scan_image:
+    source: sbom:./forge.cdx.json
+    config: .grype.yaml
+    vex: vex/forge.openvex.json,vex/release-1.4.openvex.json
+    fail_on: high
+    output_format: json
+    output_file: forge.grype.json
+```
+
+Behavior verified against Grype 0.119.0, the default version:
+
+- **Config file.** A config file's `vex-documents` key also works. Relative
+  paths in it resolve against the working directory, not the config file's
+  location.
+- **`vex` replaces `vex-documents`.** Grype does not merge the two lists. When
+  `vex` is set, documents from Grype's own configuration stop applying,
+  whether they come from the file named by `config`, a config file Grype
+  finds on its own (such as `./.grype.yaml`), or `GRYPE_VEX_DOCUMENTS`. The
+  orb asks Grype for its resolved configuration (`grype config --load`,
+  available from Grype 0.78.0) and prints a warning when it lists any. Keep
+  every document in one of the two places.
+- **Vulnerability IDs.** A statement must name the ID Grype reports. OS
+  packages are reported by CVE, but most language packages are reported by
+  GitHub advisory (for example `GHSA-xvch-5gv4-984h` rather than
+  `CVE-2021-44906`). Name that ID, or list it under the statement's `aliases`.
+- **Products.** For every source type (`sbom:`, `dir:`, images), a statement
+  whose product is the vulnerable package's purl applies, such as
+  `pkg:apk/alpine/zlib@1.2.11-r3`. For image sources, a product naming the
+  image as a `pkg:oci` purl with its digest also applies, with the package
+  purl listed as a subcomponent.
