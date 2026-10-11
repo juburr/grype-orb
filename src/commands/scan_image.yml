@@ -38,13 +38,27 @@ parameters:
       than add to) any vex-documents listed in the config file.
   output_format:
     type: enum
-    enum: ["json", "table", "cyclonedx", "cyclonedx-json", "sarif", "template"]
-    default: sarif
-    description: Format of the output report.
+    enum: ["", "json", "table", "cyclonedx", "cyclonedx-json", "sarif", "template"]
+    default: ""
+    description: >
+      Format of a single output report. Defaults to sarif when output_formats
+      is not set. Cannot be combined with output_formats.
   output_file:
     type: string
-    default: grype-scan-results.sarif
-    description: File to output scan results to.
+    default: ""
+    description: >
+      File to write a single output report to. Defaults to
+      grype-scan-results.sarif when output_formats is not set. Cannot be
+      combined with output_formats.
+  output_formats:
+    type: string
+    default: ""
+    description: >
+      Comma-separated format=path pairs, such as
+      "json=scan.json,table=scan.txt", all rendered from a single scan (one
+      cataloging pass and one vulnerability database snapshot). Each pair is
+      passed to Grype as its own -o format=path flag. Requires Grype 0.104.1
+      or later. Cannot be combined with output_format or output_file.
 steps:
   - run:
       name: Scan Image
@@ -55,6 +69,7 @@ steps:
         PARAM_ONLY_FIXED: << parameters.only_fixed >>
         PARAM_OUTPUT_FILE: << parameters.output_file >>
         PARAM_OUTPUT_FORMAT: << parameters.output_format >>
+        PARAM_OUTPUT_FORMATS: << parameters.output_formats >>
         PARAM_SOURCE: << parameters.source >>
         PARAM_VEX: << parameters.vex >>
       command: << include(scripts/scan_image.sh) >>
