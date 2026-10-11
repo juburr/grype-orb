@@ -91,7 +91,9 @@ if [[ -n "${VEX}" ]]; then
         done
     fi
     for CONFIG_FILE in "${CONFIG_FILES[@]}"; do
-        if grep -qE '^vex-documents:' "${CONFIG_FILE}" 2>/dev/null; then
+        # Without a YAML parser, match the key loosely: any uncommented mention,
+        # quoted or not, also covers "key :" spacing and inline flow mappings.
+        if grep -qE "^[^#]*vex-documents[\"']?[[:space:]]*:" "${CONFIG_FILE}" 2>/dev/null; then
             echo "WARN: ${CONFIG_FILE} sets vex-documents, which Grype ignores when the vex parameter is set." >&2
             echo "WARN: List every VEX document in either the vex parameter or the config file." >&2
         fi

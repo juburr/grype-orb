@@ -132,3 +132,22 @@ vex_args() {
     [ "${status}" -eq 0 ]
     [[ "${output}" != *"WARN"* ]]
 }
+
+@test "vex warns for other YAML spellings of vex-documents, but not for comments" {
+    export PARAM_CONFIG=grype.yaml PARAM_VEX=a.openvex.json
+    local spelling
+    for spelling in 'vex-documents : [b.openvex.json]' '"vex-documents": [b.openvex.json]' \
+        "'vex-documents': [b.openvex.json]" '{vex-documents: [b.openvex.json]}'; do
+        printf '%s\n' "${spelling}" > grype.yaml
+
+        run bash "${SCRIPTS_DIR}/scan_image.sh"
+
+        [ "${status}" -eq 0 ]
+        [[ "${output}" == *"WARN: grype.yaml sets vex-documents"* ]]
+    done
+
+    printf '# vex-documents: [b.openvex.json]\nonly-fixed: true # vex-documents: [b.openvex.json]\n' > grype.yaml
+    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" != *"WARN"* ]]
+}
