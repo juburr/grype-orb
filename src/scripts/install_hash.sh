@@ -40,15 +40,22 @@ BASE_URL="https://github.com/anchore/grype/releases/download/v${VERSION}"
 CHECKSUMS_FILE="grype_${VERSION}_checksums.txt"
 wget -q "${BASE_URL}/${CHECKSUMS_FILE}"
 
+# Grype has signed checksums.txt since 0.72.0, always from its release
+# workflow on main. Older releases publish no signature at all.
+FIRST_SIGNED_VERSION=0.72.0
 if command -v cosign > /dev/null; then
-    wget -q "${BASE_URL}/${CHECKSUMS_FILE}.sig" "${BASE_URL}/${CHECKSUMS_FILE}.pem"
-    cosign verify-blob \
-        --certificate "${CHECKSUMS_FILE}.pem" \
-        --signature "${CHECKSUMS_FILE}.sig" \
-        --certificate-identity-regexp '^https://github\.com/anchore/grype/\.github/workflows/.+' \
-        --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-        "${CHECKSUMS_FILE}" > /dev/null 2>&1 \
-        || { echo "ERROR: cosign could not verify the signature on ${CHECKSUMS_FILE}." >&2; exit 1; }
+    if [[ "$(printf '%s\n' "${FIRST_SIGNED_VERSION}" "${VERSION}" | sort -V | head -n 1)" != "${FIRST_SIGNED_VERSION}" ]]; then
+        echo "WARN: Grype ${VERSION} predates signed releases; checking tarballs against checksums.txt only." >&2
+    else
+        wget -q "${BASE_URL}/${CHECKSUMS_FILE}.sig" "${BASE_URL}/${CHECKSUMS_FILE}.pem"
+        cosign verify-blob \
+            --certificate "${CHECKSUMS_FILE}.pem" \
+            --signature "${CHECKSUMS_FILE}.sig" \
+            --certificate-identity https://github.com/anchore/grype/.github/workflows/release.yaml@refs/heads/main \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "${CHECKSUMS_FILE}" > /dev/null 2>&1 \
+            || { echo "ERROR: cosign could not verify the signature on ${CHECKSUMS_FILE}." >&2; exit 1; }
+    fi
 fi
 
 # Download each architecture's tarball, check it against checksums.txt, and
