@@ -26,9 +26,12 @@ welcome!
 
 Info for security teams:
 - Required external access to allow, if running a locked down, self-hosted CircleCI pipeline on-prem:
-  - `github.com`: For download and installation of the Grype tool.
-  - `grype.anchore.io`: For vulnerability database updates on Grype 0.88.0 and later, including the default version.
-  - `toolbox-data.anchore.io`: For vulnerability database updates on Grype 0.87.0 and earlier.
+  - `github.com`: For download and installation of the Grype tool. Release download URLs answer with a redirect to one of GitHub's asset hosts below.
+  - `release-assets.githubusercontent.com`: The host GitHub currently redirects Grype release downloads to (tarballs and checksum files alike).
+  - `objects.githubusercontent.com`: GitHub's previous redirect host for release downloads. Allow it too, so installs keep working if a download is routed there.
+  - `grype.anchore.io`: For vulnerability database updates on Grype 0.88.0 and later, including the default version. Both the database listing and the database archive are served from this host.
+  - `toolbox-data.anchore.io`: For vulnerability database updates on Grype 0.87.0 and earlier, and for the update check Grype runs at startup on every version. If this host is blocked, the check logs an error and the scan continues. Set `GRYPE_CHECK_FOR_APP_UPDATE=false` to skip it.
+  - Any registries your `scan_image` sources pull images from.
 
 ## Example Usage
 
