@@ -159,8 +159,8 @@ jobs:
 | --- | --- | --- | --- |
 | `version` | string | `0.119.0` | Grype version to install. |
 | `verify_checksums` | enum | `strict` | `strict`, `known_versions`, or `"false"`. See [Checksum verification](#checksum-verification). |
-| `caching` | boolean | `true` | Cache the Grype download, keyed by architecture and version. |
-| `install_path` | string | `/home/circleci/bin` | Directory for the binary that does not need root (no trailing slash). Added to `PATH` if it isn't already there. |
+| `caching` | boolean | `true` | Cache the Grype download, keyed by version, architecture and home directory. Only verified downloads are cached, and they are verified again when restored. |
+| `install_path` | string | `$HOME/bin` | Absolute directory for the binary that does not need root. Created if needed, and added to `PATH` if it isn't already there. |
 
 ### `log_version`
 
@@ -345,10 +345,10 @@ Contributions are welcome! Issues and pull requests are the way in.
 
 - **New Grype release?** Run `src/scripts/install_hash.sh -v <version>` to
   print the SHA-512 entries for both architectures, then paste them into the
-  checksum tables in `src/scripts/install.sh`.
-- **Before opening a PR**, run the offline unit tests with `bats tests` and
-  lint the scripts with `shellcheck src/scripts/*.sh`. CI runs both, along
-  with the orb linter and integration tests on CircleCI.
+  checksum table in `src/scripts/install.sh`.
+- **Before opening a PR**, run the offline tests with `bash tests/install_test.sh`
+  and `bats tests`, and lint the scripts with `shellcheck src/scripts/*.sh`. CI
+  runs them all, along with the orb linter and integration tests on CircleCI.
 
 ## 📜 License
 
