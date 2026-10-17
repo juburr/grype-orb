@@ -3,7 +3,9 @@
 # Each test gets its own working directory and a stub directory placed ahead
 # of the real binaries on PATH. The orb scripts read their parameters through
 # `circleci env subst`, so a stub for it is always installed; tests add more
-# stubs (grype, wget, uname, ...) with `stub`.
+# stubs (grype, wget, uname, ...) with `stub`. Like the real CLI, the stub
+# reads the value from stdin, and it fails if the value is passed as an
+# argument (see env_subst.bats).
 
 REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
 SCRIPTS_DIR="${REPO_ROOT}/src/scripts"
@@ -19,7 +21,7 @@ common_setup() {
     BASH_ENV="${BATS_TEST_TMPDIR}/bash_env"
     : > "${BASH_ENV}"
     export PATH BASH_ENV
-    stub circleci 'if [[ "$1 $2" == "env subst" ]]; then printf "%s\n" "$3"; else exit 1; fi'
+    stub circleci 'if [[ "$1 $2" == "env subst" && $# -eq 2 ]]; then cat; else exit 1; fi'
     cd "${TEST_WORK_DIR}" || return 1
 }
 

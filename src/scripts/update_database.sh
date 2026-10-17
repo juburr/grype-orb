@@ -3,7 +3,7 @@
 set -e 
 
 # Read in orb parameters
-DATABASE_PATH=$(circleci env subst "${PARAM_DATABASE_PATH}")
+DATABASE_PATH=$(printf '%s' "${PARAM_DATABASE_PATH}" | circleci env subst)
 
 # Print command arguments for debugging purposes.
 echo "Running Grype database updater..."
