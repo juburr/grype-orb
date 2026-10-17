@@ -3,9 +3,9 @@
 set -e
 
 # Read in orb parameters
-INSTALL_PATH=$(circleci env subst "${PARAM_INSTALL_PATH}")
+INSTALL_PATH=$(printf '%s' "${PARAM_INSTALL_PATH}" | circleci env subst)
 VERIFY_CHECKSUMS="${PARAM_VERIFY_CHECKSUMS:-strict}"
-VERSION=$(circleci env subst "${PARAM_VERSION}")
+VERSION=$(printf '%s' "${PARAM_VERSION}" | circleci env subst)
 
 # Grype publishes a Linux release asset per CPU architecture. Map this
 # machine onto the asset naming, and refuse anything else rather than

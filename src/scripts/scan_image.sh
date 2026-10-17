@@ -3,15 +3,15 @@
 set -euo pipefail
 
 # Read in orb parameters
-FAIL_ON=$(circleci env subst "${PARAM_FAIL_ON}")
-CONFIG=$(circleci env subst "${PARAM_CONFIG}")
-IMAGE=$(circleci env subst "${PARAM_IMAGE}")
-ONLY_FIXED=$(circleci env subst "${PARAM_ONLY_FIXED}")
-OUTPUT_FILE=$(circleci env subst "${PARAM_OUTPUT_FILE}")
-OUTPUT_FORMAT=$(circleci env subst "${PARAM_OUTPUT_FORMAT}")
-OUTPUT_FORMATS=$(circleci env subst "${PARAM_OUTPUT_FORMATS}")
-SOURCE=$(circleci env subst "${PARAM_SOURCE}")
-VEX=$(circleci env subst "${PARAM_VEX}")
+FAIL_ON=$(printf '%s' "${PARAM_FAIL_ON}" | circleci env subst)
+CONFIG=$(printf '%s' "${PARAM_CONFIG}" | circleci env subst)
+IMAGE=$(printf '%s' "${PARAM_IMAGE}" | circleci env subst)
+ONLY_FIXED=$(printf '%s' "${PARAM_ONLY_FIXED}" | circleci env subst)
+OUTPUT_FILE=$(printf '%s' "${PARAM_OUTPUT_FILE}" | circleci env subst)
+OUTPUT_FORMAT=$(printf '%s' "${PARAM_OUTPUT_FORMAT}" | circleci env subst)
+OUTPUT_FORMATS=$(printf '%s' "${PARAM_OUTPUT_FORMATS}" | circleci env subst)
+SOURCE=$(printf '%s' "${PARAM_SOURCE}" | circleci env subst)
+VEX=$(printf '%s' "${PARAM_VEX}" | circleci env subst)
 
 if [[ -n "${SOURCE}" && -n "${IMAGE}" ]]; then
     echo "ERROR: source and image are mutually exclusive; set exactly one." >&2
