@@ -31,17 +31,24 @@ verify_upstream() {
         return 1
     fi
     # From 0.72.0 on, Grype signs the list with a keyless Sigstore
-    # certificate, so a missing signature is an error. Older lists are used unsigned.
+    # certificate, in a .sigstore.json bundle or a .sig and .pem pair, so a missing
+    # signature is an error. Older lists are used unsigned.
+    local signature=(--bundle list.sigstore.json)
     rc=0
-    hash_fetch "${base}/grype_$1_checksums.txt.sig" list.sig || rc=$?
-    if [[ "${rc}" -eq 0 ]]; then
-        hash_fetch "${base}/grype_$1_checksums.txt.pem" list.pem || rc=$?
+    hash_fetch "${base}/grype_$1_checksums.txt.sigstore.json" list.sigstore.json || rc=$?
+    if [[ "${rc}" -eq 2 ]]; then
+        signature=(--signature list.sig --certificate list.pem)
+        rc=0
+        hash_fetch "${base}/grype_$1_checksums.txt.sig" list.sig || rc=$?
+        if [[ "${rc}" -eq 0 ]]; then
+            hash_fetch "${base}/grype_$1_checksums.txt.pem" list.pem || rc=$?
+        fi
     fi
     if [[ "${rc}" -eq 1 ]]; then
         return 1
     elif [[ "${rc}" -eq 2 ]]; then
         if hash_version_le 0.72.0 "$1"; then
-            echo "ERROR: Grype signs grype_$1_checksums.txt from 0.72.0 on, but $1 has no signature and certificate."
+            echo "ERROR: Grype signs grype_$1_checksums.txt from 0.72.0 on, but $1 has neither a Sigstore bundle nor a signature and certificate."
             return 1
         fi
         echo "NOTE: Grype $1 publishes no keyless signature for grype_$1_checksums.txt; using it unsigned."
@@ -50,7 +57,7 @@ verify_upstream() {
             echo "ERROR: cosign is required to verify the signature on grype_$1_checksums.txt."
             return 1
         fi
-        if ! cosign verify-blob --signature list.sig --certificate list.pem \
+        if ! cosign verify-blob "${signature[@]}" \
             --certificate-identity https://github.com/anchore/grype/.github/workflows/release.yaml@refs/heads/main \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com list > /dev/null 2>&1; then
             echo "ERROR: cosign could not verify the signature on grype_$1_checksums.txt."
