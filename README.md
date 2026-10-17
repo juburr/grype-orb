@@ -73,7 +73,7 @@ vulnerability rated `high` or `critical`:
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@latest
+  grype: juburr/grype-orb@0.5.0
 
 jobs:
   vulnerability_scan:
@@ -95,6 +95,9 @@ workflows:
 With no output settings, `scan_image` writes a SARIF report to
 `grype-scan-results.sarif`.
 
+CircleCI has no `latest` tag for registry orbs, so pin a release. The orb
+version badge above shows the newest one.
+
 <details>
 <summary><b>Full example: pinned versions, strict checksums, and a SARIF report</b></summary>
 <br />
@@ -103,7 +106,7 @@ With no output settings, `scan_image` writes a SARIF report to
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@latest
+  grype: juburr/grype-orb@0.5.0
 
 parameters:
   cimg_base_version:
