@@ -159,7 +159,7 @@ jobs:
 | --- | --- | --- | --- |
 | `version` | string | `0.119.0` | Grype version to install. |
 | `verify_checksums` | enum | `strict` | `strict`, `known_versions`, or `"false"`. See [Checksum verification](#checksum-verification). |
-| `caching` | boolean | `true` | Cache the Grype download, keyed by version and architecture. Only verified downloads are cached, and they are verified again when restored. |
+| `caching` | boolean | `true` | Cache the Grype download, keyed by version, architecture and home directory. Only verified downloads are cached, and they are verified again when restored. |
 | `install_path` | string | `$HOME/bin` | Absolute directory for the binary that does not need root. Created if needed, and added to `PATH` if it isn't already there. |
 
 ### `log_version`
