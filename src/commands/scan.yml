@@ -2,11 +2,12 @@ description: Scans a container image, SBOM, directory, or other Grype source.
 parameters:
   fail_on:
     type: enum
-    enum: ["", "negligible", "low", "medium", "high", "critical"]
-    default: ""
+    enum: ["critical", "high", "medium", "low", "negligible", "never"]
+    default: never
     description: >
       Exits with error code 2 if a vulnerability is found at or above the
       supplied severity level. Grype 0.91.0 and earlier exit with error code 1.
+      The default, never, reports vulnerabilities without failing the step.
   source:
     type: string
     description: >

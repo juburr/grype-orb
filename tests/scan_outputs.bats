@@ -56,7 +56,8 @@ output_args() {
 # variable"; on any bash, a fix that expands one to "" would pass grype an
 # empty argument. So check the exact arguments, one per line.
 @test "optional parameters left at their defaults add no arguments to the scan" {
-    [ -z "${PARAM_FAIL_ON}${PARAM_CONFIG}${PARAM_VEX}" ]
+    [ "${PARAM_FAIL_ON}" = never ]
+    [ -z "${PARAM_CONFIG}${PARAM_VEX}" ]
     [ "${PARAM_ONLY_FIXED}" = false ]
 
     run bash "${SCRIPTS_DIR}/scan.sh"
@@ -64,6 +65,32 @@ output_args() {
     [ "${status}" -eq 0 ]
     [[ "${output}" != *"unbound variable"* ]]
     printf '%s\n' sbom:./sbom.json -o sarif --add-cpes-if-none -vv | diff - "${GRYPE_ARGS}"
+}
+
+@test "fail_on passes a severity to grype as --fail-on" {
+    local level
+    for level in critical high medium low negligible; do
+        export PARAM_FAIL_ON="${level}"
+
+        run bash "${SCRIPTS_DIR}/scan.sh"
+
+        [ "${status}" -eq 0 ]
+        printf '%s\n' sbom:./sbom.json -o sarif --add-cpes-if-none -vv --fail-on "${level}" | diff - "${GRYPE_ARGS}"
+    done
+}
+
+@test "fail_on rejects an empty value and anything but a severity or never" {
+    local value
+    for value in "" true HIGH; do
+        export PARAM_FAIL_ON="${value}"
+        rm -f "${GRYPE_ARGS}"
+
+        run bash "${SCRIPTS_DIR}/scan.sh"
+
+        [ "${status}" -eq 2 ]
+        [[ "${output}" == *"ERROR: fail_on must be critical, high, medium, low, negligible, or never; got '${value}'."* ]]
+        [ ! -e "${GRYPE_ARGS}" ]
+    done
 }
 
 @test "a single format=file entry redirects stdout to the file, creating its directory" {
