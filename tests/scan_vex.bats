@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# VEX parameter tests for src/scripts/scan_image.sh. A stub grype records the
+# VEX parameter tests for src/scripts/scan.sh. A stub grype records the
 # arguments of a scan, one per line, so the tests can check how parameters are
 # mapped. For `grype config --load` it records those arguments separately and
 # prints GRYPE_CONFIG_DUMP, modelled on Grype's real output, or fails when that
@@ -21,10 +21,10 @@ fi
 printf '%s\n' \"\$@\" > '${GRYPE_ARGS}'"
     config_dump 'vex-documents: []'
 
-    # Start from the defaults the orb passes for every scan_image parameter.
+    # Start from the defaults the orb passes for every scan parameter.
     local param
-    for param in $(awk '/^parameters:/ { p = 1; next } p && /^[^ ]/ { exit } p && /^  [a-z_]+:$/ { sub(/:$/, ""); print $1 }' "${COMMANDS_DIR}/scan_image.yml"); do
-        export "PARAM_${param^^}=$(command_default scan_image "${param}")"
+    for param in $(awk '/^parameters:/ { p = 1; next } p && /^[^ ]/ { exit } p && /^  [a-z_]+:$/ { sub(/:$/, ""); print $1 }' "${COMMANDS_DIR}/scan.yml"); do
+        export "PARAM_${param^^}=$(command_default scan "${param}")"
     done
     export PARAM_SOURCE="sbom:./sbom.json"
     printf '{}\n' > a.openvex.json
@@ -50,7 +50,7 @@ vex_args() {
 @test "vex is empty by default and adds no --vex flags" {
     [ -z "${PARAM_VEX}" ]
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -eq 0 ]
     [ "$(grep -cx -- '--vex' "${GRYPE_ARGS}")" -eq 0 ]
@@ -59,7 +59,7 @@ vex_args() {
 @test "a single VEX document becomes one --vex flag" {
     export PARAM_VEX=a.openvex.json
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -eq 0 ]
     [ "$(vex_args)" = "a.openvex.json" ]
@@ -68,7 +68,7 @@ vex_args() {
 @test "comma-separated VEX documents become repeated --vex flags, in order" {
     export PARAM_VEX="b.openvex.json, a.openvex.json"
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -eq 0 ]
     [ "$(vex_args)" = "$(printf 'b.openvex.json\na.openvex.json')" ]
@@ -77,7 +77,7 @@ vex_args() {
 @test "a missing VEX document fails before scanning" {
     export PARAM_VEX="a.openvex.json,missing.openvex.json"
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -ne 0 ]
     [[ "${output}" == *"ERROR: VEX document not found: 'missing.openvex.json'"* ]]
@@ -87,7 +87,7 @@ vex_args() {
 @test "an empty entry in the VEX list fails before scanning" {
     export PARAM_VEX="a.openvex.json,,b.openvex.json"
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -ne 0 ]
     [[ "${output}" == *"ERROR: VEX document not found: ''"* ]]
@@ -97,7 +97,7 @@ vex_args() {
 @test "a trailing comma in the VEX list fails before scanning" {
     export PARAM_VEX="a.openvex.json,"
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -ne 0 ]
     [[ "${output}" == *"ERROR: VEX document not found: ''"* ]]
@@ -108,7 +108,7 @@ vex_args() {
     config_dump 'vex-documents:' "  - 'b.openvex.json'" "  - 'policy/c.openvex.json'"
     export PARAM_CONFIG=grype.yaml PARAM_VEX=a.openvex.json
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -eq 0 ]
     [[ "${output}" == *"WARN: Grype's configuration lists vex-documents (b.openvex.json, policy/c.openvex.json)"* ]]
@@ -119,7 +119,7 @@ vex_args() {
 @test "vex does not warn when Grype's configuration lists no vex-documents" {
     export PARAM_VEX=a.openvex.json
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -eq 0 ]
     [[ "${output}" != *"WARN"* ]]
@@ -129,7 +129,7 @@ vex_args() {
 @test "without vex, Grype's configuration is not queried" {
     config_dump 'vex-documents:' "  - 'b.openvex.json'"
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -eq 0 ]
     [[ "${output}" != *"WARN"* ]]
@@ -140,7 +140,7 @@ vex_args() {
     rm "${GRYPE_CONFIG_DUMP}"
     export PARAM_VEX=a.openvex.json
 
-    run bash "${SCRIPTS_DIR}/scan_image.sh"
+    run bash "${SCRIPTS_DIR}/scan.sh"
 
     [ "${status}" -eq 0 ]
     [[ "${output}" == *"WARN: Could not read Grype's configuration (grype config --load needs Grype 0.78.0 or later)."* ]]
