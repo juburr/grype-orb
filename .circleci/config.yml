@@ -18,11 +18,21 @@ jobs:
       - run:
           name: Run install contract tests
           command: bash tests/install_test.sh
+  test-shell-conventions:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - run:
+          name: Check the shell conventions of src/scripts
+          command: bash tests/shell_conventions_test.sh
 
 workflows:
   lint-pack:
     jobs:
       - test-install:
+          filters: *filters
+      - test-shell-conventions:
           filters: *filters
       - orb-tools/lint:
           filters: *filters
@@ -41,5 +51,5 @@ workflows:
           pipeline_number: << pipeline.number >>
           vcs_type: << pipeline.project.type >>
           orb_name: grype-orb
-          requires: [test-install, orb-tools/lint, orb-tools/pack, orb-tools/review, shellcheck/check, bats/run]
+          requires: [test-install, test-shell-conventions, orb-tools/lint, orb-tools/pack, orb-tools/review, shellcheck/check, bats/run]
           filters: *filters

@@ -94,6 +94,25 @@ vex_args() {
     [ ! -e "${GRYPE_ARGS}" ]
 }
 
+@test "whitespace and newlines around the VEX list are ignored" {
+    export PARAM_VEX=$'\na.openvex.json\n'
+
+    run bash "${SCRIPTS_DIR}/scan.sh"
+
+    [ "${status}" -eq 0 ]
+    [ "$(vex_args)" = "a.openvex.json" ]
+}
+
+@test "a VEX list over several lines fails before scanning" {
+    export PARAM_VEX=$'a.openvex.json,\nb.openvex.json'
+
+    run bash "${SCRIPTS_DIR}/scan.sh"
+
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"ERROR: vex must be on one line"* ]]
+    [ ! -e "${GRYPE_ARGS}" ]
+}
+
 @test "a trailing comma in the VEX list fails before scanning" {
     export PARAM_VEX="a.openvex.json,"
 
