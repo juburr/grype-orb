@@ -15,11 +15,23 @@ if [[ -z "${SOURCE}" ]]; then
     exit 2
 fi
 
+# output and vex are comma-separated lists on one line: read stops at a
+# newline, so the entries after one would be lost. Whitespace around a list,
+# such as the final newline of a YAML block scalar, is ignored.
+OUTPUT="${OUTPUT#"${OUTPUT%%[![:space:]]*}"}"
+OUTPUT="${OUTPUT%"${OUTPUT##*[![:space:]]}"}"
+VEX="${VEX#"${VEX%%[![:space:]]*}"}"
+VEX="${VEX%"${VEX##*[![:space:]]}"}"
+
 # output uses Grype's own -o syntax: a comma-separated list of entries, each
 # "format" (printed in the step log) or "format=file". REPORT_FORMATS and
 # REPORT_FILES hold one element per entry, with an empty file for the log.
-if [[ -z "${OUTPUT//[[:space:]]/}" ]]; then
+if [[ -z "${OUTPUT}" ]]; then
     echo "ERROR: output is empty; list at least one format, such as sarif=grype-scan-results.sarif or table." >&2
+    exit 2
+fi
+if [[ "${OUTPUT}" == *$'\n'* ]]; then
+    echo "ERROR: output must be on one line; separate its entries with commas." >&2
     exit 2
 fi
 VALID_REPORT_FORMATS=(json table cyclonedx cyclonedx-json sarif template)
@@ -31,7 +43,6 @@ STDOUT_ENTRIES=0
 IFS=',' read -ra OUTPUT_ENTRIES <<< "${OUTPUT},"
 # Arrays that can be empty are expanded as ${a[@]+"${a[@]}"}: under set -u,
 # bash before 4.4 treats an empty array as unset and "${a[@]}" aborts.
-# OUTPUT_ENTRIES is empty when output starts with a newline (read stops at it).
 for OUTPUT_ENTRY in ${OUTPUT_ENTRIES[@]+"${OUTPUT_ENTRIES[@]}"}; do
     # Trim surrounding whitespace, so "json=a.json, table" works.
     OUTPUT_ENTRY="${OUTPUT_ENTRY#"${OUTPUT_ENTRY%%[![:space:]]*}"}"
@@ -125,6 +136,10 @@ esac
 # Grype does not split a comma-separated --vex value, so pass each document
 # as its own flag, and fail early on a path that does not exist.
 VEX_ARGS=()
+if [[ "${VEX}" == *$'\n'* ]]; then
+    echo "ERROR: vex must be on one line; separate its documents with commas." >&2
+    exit 2
+fi
 if [[ -n "${VEX}" ]]; then
     # The extra trailing comma stops read from dropping a final empty entry,
     # so "a.json," is rejected like any other empty entry.

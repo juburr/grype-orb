@@ -191,6 +191,31 @@ output_args() {
     [ ! -e "${GRYPE_ARGS}" ]
 }
 
+@test "whitespace and newlines around output are ignored" {
+    export PARAM_OUTPUT=$'\n json=scan.json \n'
+
+    run bash "${SCRIPTS_DIR}/scan.sh"
+
+    [ "${status}" -eq 0 ]
+    [ "$(output_args)" = "json" ]
+    [ "$(cat scan.json)" = "stdout-report" ]
+}
+
+# read stops at a newline, so a list over several lines would lose the
+# entries after the first line.
+@test "an output list over several lines is rejected" {
+    local value
+    for value in $'json=scan.json,\ntable=scan.txt' $'json=scan.json\ntable'; do
+        export PARAM_OUTPUT="${value}"
+
+        run bash "${SCRIPTS_DIR}/scan.sh"
+
+        [ "${status}" -ne 0 ]
+        [[ "${output}" == *"ERROR: output must be on one line"* ]]
+        [ ! -e "${GRYPE_ARGS}" ]
+    done
+}
+
 @test "an empty output is rejected" {
     local value
     for value in "" "  "; do
