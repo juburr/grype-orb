@@ -50,6 +50,22 @@ output_args() {
     [[ "${output}" != *"stdout-report"* ]]
 }
 
+# With fail_on, config, only_fixed and vex at their defaults, scan.sh expands
+# four empty argument arrays. Under set -u, bash before 4.4 treats an empty
+# array as unset, so a plain "${a[@]}" aborts the scan with "unbound
+# variable"; on any bash, a fix that expands one to "" would pass grype an
+# empty argument. So check the exact arguments, one per line.
+@test "optional parameters left at their defaults add no arguments to the scan" {
+    [ -z "${PARAM_FAIL_ON}${PARAM_CONFIG}${PARAM_VEX}" ]
+    [ "${PARAM_ONLY_FIXED}" = false ]
+
+    run bash "${SCRIPTS_DIR}/scan.sh"
+
+    [ "${status}" -eq 0 ]
+    [[ "${output}" != *"unbound variable"* ]]
+    printf '%s\n' sbom:./sbom.json -o sarif --add-cpes-if-none -vv | diff - "${GRYPE_ARGS}"
+}
+
 @test "a single format=file entry redirects stdout to the file, creating its directory" {
     export PARAM_OUTPUT=json=reports/nested/scan.json
 

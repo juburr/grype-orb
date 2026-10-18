@@ -29,7 +29,10 @@ STDOUT_ENTRIES=0
 # The extra trailing comma stops read from dropping a final empty entry, so
 # "json=a.json," is rejected like any other malformed entry.
 IFS=',' read -ra OUTPUT_ENTRIES <<< "${OUTPUT},"
-for OUTPUT_ENTRY in "${OUTPUT_ENTRIES[@]}"; do
+# Arrays that can be empty are expanded as ${a[@]+"${a[@]}"}: under set -u,
+# bash before 4.4 treats an empty array as unset and "${a[@]}" aborts.
+# OUTPUT_ENTRIES is empty when output starts with a newline (read stops at it).
+for OUTPUT_ENTRY in ${OUTPUT_ENTRIES[@]+"${OUTPUT_ENTRIES[@]}"}; do
     # Trim surrounding whitespace, so "json=a.json, table" works.
     OUTPUT_ENTRY="${OUTPUT_ENTRY#"${OUTPUT_ENTRY%%[![:space:]]*}"}"
     OUTPUT_ENTRY="${OUTPUT_ENTRY%"${OUTPUT_ENTRY##*[![:space:]]}"}"
@@ -126,7 +129,7 @@ if [[ -n "${VEX}" ]]; then
     # The extra trailing comma stops read from dropping a final empty entry,
     # so "a.json," is rejected like any other empty entry.
     IFS=',' read -ra VEX_DOCUMENTS <<< "${VEX},"
-    for VEX_DOCUMENT in "${VEX_DOCUMENTS[@]}"; do
+    for VEX_DOCUMENT in ${VEX_DOCUMENTS[@]+"${VEX_DOCUMENTS[@]}"}; do
         # Trim surrounding whitespace, so "a.json, b.json" works.
         VEX_DOCUMENT="${VEX_DOCUMENT#"${VEX_DOCUMENT%%[![:space:]]*}"}"
         VEX_DOCUMENT="${VEX_DOCUMENT%"${VEX_DOCUMENT##*[![:space:]]}"}"
@@ -142,7 +145,7 @@ if [[ -n "${VEX}" ]]; then
     # applying. Ask Grype for its resolved configuration rather than parsing
     # YAML here: that covers the config file, Grype's search paths and
     # GRYPE_VEX_DOCUMENTS, in any valid spelling.
-    if CONFIG_DUMP=$(grype config --load "${CONFIG_ARG[@]}" 2>/dev/null); then
+    if CONFIG_DUMP=$(grype config --load ${CONFIG_ARG[@]+"${CONFIG_ARG[@]}"} 2>/dev/null); then
         CONFIGURED_VEX=$(awk '
             /^vex-documents:/ { found = 1; sub(/^vex-documents:[[:space:]]*/, ""); if ($0 != "[]") docs = $0; next }
             found && /^[[:space:]]+- / { sub(/^[[:space:]]+- /, ""); docs = docs (docs == "" ? "" : ", ") $0; next }
@@ -159,7 +162,7 @@ if [[ -n "${VEX}" ]]; then
     fi
 fi
 
-for REPORT_FILE in "${REPORT_FILES[@]}"; do
+for REPORT_FILE in ${REPORT_FILES[@]+"${REPORT_FILES[@]}"}; do
     if [[ -n "${REPORT_FILE}" ]]; then
         mkdir -p -- "$(dirname -- "${REPORT_FILE}")"
     fi
@@ -175,8 +178,9 @@ else
     exec 3>&1
 fi
 
-grype "${SOURCE}" "${OUTPUT_ARGS[@]}" --add-cpes-if-none -vv \
-    "${FAIL_ARG[@]}" "${CONFIG_ARG[@]}" "${ONLY_FIXED_ARG[@]}" "${VEX_ARGS[@]}" >&3
+grype "${SOURCE}" ${OUTPUT_ARGS[@]+"${OUTPUT_ARGS[@]}"} --add-cpes-if-none -vv \
+    ${FAIL_ARG[@]+"${FAIL_ARG[@]}"} ${CONFIG_ARG[@]+"${CONFIG_ARG[@]}"} \
+    ${ONLY_FIXED_ARG[@]+"${ONLY_FIXED_ARG[@]}"} ${VEX_ARGS[@]+"${VEX_ARGS[@]}"} >&3
 
 for i in "${!REPORT_FORMATS[@]}"; do
     echo "Wrote the ${REPORT_FORMATS[i]} report to: ${REPORT_FILES[i]:-the step log}"
