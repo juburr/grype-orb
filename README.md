@@ -73,7 +73,7 @@ vulnerability rated `high` or `critical`:
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@0.5.0
+  grype: juburr/grype-orb@0.6.0
 
 jobs:
   vulnerability_scan:
@@ -106,7 +106,7 @@ version badge above shows the newest one.
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@0.5.0
+  grype: juburr/grype-orb@0.6.0
 
 parameters:
   cimg_base_version:
