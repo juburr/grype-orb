@@ -1,4 +1,6 @@
-description: Updates the grype vulnerability database.
+description: >
+  Updates the Grype vulnerability database in database_dir, and points the
+  job's later steps (such as scan) at that directory.
 parameters:
   caching:
     type: boolean
@@ -7,14 +9,18 @@ parameters:
       Option to cache the vulnerability database in the pipeline. The installation is typically
       faster than the cache restoration most of the time, but anchore.io can slow to a crawl at
       peak hours and sometimes fail. We therefore recommend the use of caching at this time.
-  database_path:
+  database_dir:
     type: string
-    default: "/home/circleci/.cache/grype/db"
-    description: Path to a directory where vulnerability database is stored (no trailing slash).
+    default: "~/.cache/grype/db"
+    description: >
+      Directory where Grype stores the vulnerability database. A leading ~ is
+      expanded to $HOME, a relative path is resolved against the working
+      directory, and environment variables are expanded. The result is set
+      as GRYPE_DB_CACHE_DIR for the update and exported through $BASH_ENV,
+      so later steps of the job, such as scan, use the same database. With
+      caching, this directory is restored and saved as given; the cache
+      steps expand ~ but not environment variables.
 steps:
-  - run:
-      name: Capture Grype Version
-      command: << include(scripts/extract_grype_version.sh) >>
   - when:
       condition: << parameters.caching >>
       steps:
@@ -23,7 +29,7 @@ steps:
   - run:
       name: Update Vulnerability Database
       environment:
-        PARAM_DATABASE_PATH: << parameters.database_path >>
+        PARAM_DATABASE_DIR: << parameters.database_dir >>
       command: << include(scripts/update_database.sh) >>
   - when:
       condition: << parameters.caching >>
@@ -31,7 +37,7 @@ steps:
         - save_cache:
             key: grype-vuln-db-cache-v1
             paths:
-              - << parameters.database_path >>
+              - << parameters.database_dir >>
   - run:
       name: Log Vulnerability Databases
       command: grype db list

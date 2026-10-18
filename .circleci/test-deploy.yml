@@ -35,24 +35,21 @@ jobs:
             command -v grype
             grype version
             grype version | grep -E '^Platform:[[:space:]]+linux/amd64$'
-      - grype-orb/log_version
       - grype-orb/update_database
-      - grype-orb/scan_image:
-          image: gcr.io/distroless/base:latest
-          output_file: distroless.base.scan.json
-          output_format: json
+      - grype-orb/scan:
+          source: gcr.io/distroless/base:latest
+          output: json=distroless.base.scan.json
       - run:
           name: Log Scan Results
           command: cat distroless.base.scan.json
       - run:
           name: Create a minimal Grype policy file
           command: printf '{}\n' > /tmp/grype-orb-test.yaml
-      - grype-orb/scan_image:
+      - grype-orb/scan:
           source: dir:.
           config: /tmp/grype-orb-test.yaml
           only_fixed: true
-          output_file: repository.scan.json
-          output_format: json
+          output: json=repository.scan.json
       - run:
           name: Verify source/config/only-fixed scan
           command: test -s repository.scan.json
@@ -61,28 +58,25 @@ jobs:
       # keeps NVD's CPE data (which does change) out of the matches, leaving two
       # CVEs. The OpenVEX fixture marks only the Critical one (CVE-2022-37434)
       # not_affected.
-      - grype-orb/scan_image:
+      - grype-orb/scan:
           source: sbom:tests/fixtures/vex/zlib.cdx.json
-          output_file: vex-baseline.scan.json
-          output_format: json
+          output: json=vex-baseline.scan.json
       - run:
           name: Verify VEX Fixture Baseline
           command: |
             # Without VEX, CVE-2022-37434 must be the fixture's only Critical, so
             # the fail_on: critical scans below test exactly that one match.
             jq -e '[.matches[] | select(.vulnerability.severity == "Critical") | .vulnerability.id] == ["CVE-2022-37434"]' vex-baseline.scan.json
-      - grype-orb/scan_image:
+      - grype-orb/scan:
           source: sbom:tests/fixtures/vex/zlib.cdx.json
           vex: tests/fixtures/vex/zlib.openvex.json
           fail_on: critical
-          output_file: vex-parameter.scan.json
-          output_format: json
-      - grype-orb/scan_image:
+          output: json=vex-parameter.scan.json
+      - grype-orb/scan:
           source: sbom:tests/fixtures/vex/zlib.cdx.json
           config: tests/fixtures/vex/grype.yaml
           fail_on: critical
-          output_file: vex-config.scan.json
-          output_format: json
+          output: json=vex-config.scan.json
       - run:
           name: Verify VEX Filtering
           command: |
@@ -94,20 +88,22 @@ jobs:
               # ...while the High CVE the statement does not cover is still reported.
               jq -e 'any(.matches[]; .vulnerability.id == "CVE-2018-25032")' "${report}"
             done
-      # Several report formats rendered from a single scan.
-      - grype-orb/scan_image:
+      # Several report formats rendered from a single scan, one of them in
+      # the step log, with files in a directory that does not exist yet.
+      - grype-orb/scan:
           source: gcr.io/distroless/base:latest
-          output_formats: json=distroless.base.scan.multi.json,table=distroless.base.scan.multi.txt
+          output: json=multi/distroless.base.scan.json,table=multi/distroless.base.scan.txt,sarif
       - run:
           name: Verify Multiple Report Formats
           command: |
-            jq -e '.matches | type == "array"' distroless.base.scan.multi.json
-            test -s distroless.base.scan.multi.txt
-            cat distroless.base.scan.multi.txt
-            # Only the requested reports are written, not the single-report default.
+            jq -e '.matches | type == "array"' multi/distroless.base.scan.json
+            test -s multi/distroless.base.scan.txt
+            cat multi/distroless.base.scan.txt
+            # Only the requested reports are written, not the default file.
             test ! -e grype-scan-results.sarif
 
-  # Runs the orb natively on an Arm machine executor, with default parameters.
+  # Runs the orb natively on an Arm machine executor, with the default scan
+  # output and a database_dir other than the default.
   command-test-arm64:
     machine:
       image: ubuntu-2404:current
@@ -122,15 +118,22 @@ jobs:
             command -v grype
             grype version
             grype version | grep -E '^Platform:[[:space:]]+linux/arm64$'
-      - grype-orb/log_version
-      - grype-orb/update_database
-      - grype-orb/scan_image:
+      # A database_dir other than the default must reach the later steps.
+      - grype-orb/update_database:
+          caching: false
+          database_dir: ~/grype-orb-test-db
+      - run:
+          name: Verify database_dir Is Exported
+          command: |
+            test "${GRYPE_DB_CACHE_DIR}" = "${HOME}/grype-orb-test-db"
+            # Fails unless the database in that directory is valid.
+            grype db status | tee grype-db-status.txt
+            grep -F "${HOME}/grype-orb-test-db/" grype-db-status.txt
+      - grype-orb/scan:
           source: dir:.
-          output_file: repository.arm64.scan.json
-          output_format: json
       - run:
           name: Verify arm64 Scan
-          command: test -s repository.arm64.scan.json
+          command: jq -e '.runs | type == "array"' grype-scan-results.sarif
 
 workflows:
   test-deploy:

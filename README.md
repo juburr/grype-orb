@@ -42,7 +42,7 @@ and fail the build when a vulnerability crosses the severity line you set.
   <tr>
     <td width="33%" valign="top">
       <h3>📄 Reports for your tools</h3>
-      <p>SARIF, JSON, CycloneDX, or a readable table. Render several formats from a single scan with <code>output_formats</code>.</p>
+      <p>SARIF, JSON, CycloneDX, or a readable table. List several formats in <code>output</code> to render them all from a single scan.</p>
     </td>
     <td width="33%" valign="top">
       <h3>🧾 Understands VEX</h3>
@@ -58,7 +58,7 @@ and fail the build when a vulnerability crosses the severity line you set.
 ```mermaid
 flowchart LR
     A["<b>grype/install</b><br/>download · verify · cache"] --> B["<b>grype/update_database</b><br/>fetch · cache vuln DB"]
-    B --> C["<b>grype/scan_image</b><br/>image · SBOM · dir · registry"]
+    B --> C["<b>grype/scan</b><br/>image · SBOM · dir · registry"]
     C --> D["📄 Reports<br/>SARIF · JSON · CycloneDX · table"]
     C -- "fail_on tripped" --> F["❌ Job fails"]
     C -- "all clear" --> G["✅ Job passes"]
@@ -73,7 +73,7 @@ vulnerability rated `high` or `critical`:
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@0.5.0
+  grype: juburr/grype-orb@0.6.0
 
 jobs:
   vulnerability_scan:
@@ -82,7 +82,7 @@ jobs:
     steps:
       - grype/install
       - grype/update_database
-      - grype/scan_image:
+      - grype/scan:
           source: gcr.io/distroless/base:latest
           fail_on: high
 
@@ -92,7 +92,7 @@ workflows:
       - vulnerability_scan
 ```
 
-With no output settings, `scan_image` writes a SARIF report to
+With the default `output`, `scan` writes a SARIF report to
 `grype-scan-results.sarif`.
 
 CircleCI has no `latest` tag for registry orbs, so pin a release. The orb
@@ -106,7 +106,7 @@ version badge above shows the newest one.
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@0.5.0
+  grype: juburr/grype-orb@0.6.0
 
 parameters:
   cimg_base_version:
@@ -123,6 +123,7 @@ jobs:
     parameters:
       image:
         type: string
+        default: "gcr.io/distroless/base:latest"
         description: "container image to scan"
     steps:
       - checkout
@@ -130,13 +131,11 @@ jobs:
           caching: true
           verify_checksums: strict
           version: << pipeline.parameters.grype_version >>
-      - grype/log_version
       - grype/update_database
-      - grype/scan_image:
+      - grype/scan:
           fail_on: critical
-          image: gcr.io/distroless/base:latest
-          output_file: gcr.distroless.base.grype.sarif
-          output_format: sarif
+          source: << parameters.image >>
+          output: sarif=gcr.distroless.base.grype.sarif
       - run:
           name: Log Scan Results
           command: cat gcr.distroless.base.grype.sarif
@@ -149,9 +148,8 @@ jobs:
 | Command | What it does |
 | --- | --- |
 | [`grype/install`](#install) | Downloads Grype from its official GitHub releases, verifies the SHA-512 checksum, and installs it to a user-owned directory. Run this first. |
-| [`grype/log_version`](#log_version) | Prints the installed Grype version to the job output. |
 | [`grype/update_database`](#update_database) | Downloads the latest vulnerability database, with optional caching. |
-| [`grype/scan_image`](#scan_image) | Scans an image, SBOM, directory, or other Grype source, writes reports, and can fail the job by severity. |
+| [`grype/scan`](#scan) | Scans an image, SBOM, directory, or other Grype source, writes reports, and can fail the job by severity. |
 
 ### `install`
 
@@ -162,30 +160,23 @@ jobs:
 | `caching` | boolean | `true` | Cache the Grype download, keyed by version, architecture and home directory. Only verified downloads are cached, and they are verified again when restored. |
 | `install_path` | string | `$HOME/bin` | Absolute directory for the binary that does not need root. Created if needed, and added to `PATH` if it isn't already there. |
 
-### `log_version`
-
-No parameters.
-
 ### `update_database`
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
 | `caching` | boolean | `true` | Cache the vulnerability database. Recommended, because Anchore's database host can be slow or fail at peak hours. |
-| `database_path` | string | `/home/circleci/.cache/grype/db` | Directory where the database is stored (no trailing slash). |
+| `database_dir` | string | `~/.cache/grype/db` | Directory for the database. A leading `~` is expanded to `$HOME`. It is exported as `GRYPE_DB_CACHE_DIR` to the job's later steps, so `scan` uses the same database. |
 
-### `scan_image`
+### `scan`
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `source` | string | | Any Grype source: an image reference, or a scheme such as `sbom:`, `dir:`, `registry:`, `docker:`, `oci-dir:`, `cpes:`, or `zarf:`. Set exactly one of `source` or `image`. |
-| `image` | string | | Container image to scan. Kept for backward compatibility; prefer `source`. |
+| `source` | string | *required* | Any Grype source: an image reference, or a scheme such as `sbom:`, `dir:`, `registry:`, `docker:`, `oci-dir:`, `cpes:`, or `zarf:`. |
 | `fail_on` | enum | | `negligible`, `low`, `medium`, `high`, or `critical`. Fails the step when a vulnerability at or above this severity is found. Leave empty to report without gating. |
 | `only_fixed` | boolean | `false` | Report only vulnerabilities that have a fix. |
 | `config` | string | | Grype configuration file, passed as `--config`. |
 | `vex` | string | | Comma-separated OpenVEX document paths. See [VEX](#vex). |
-| `output_format` | enum | `sarif` | `json`, `table`, `cyclonedx`, `cyclonedx-json`, `sarif`, or `template`. |
-| `output_file` | string | `grype-scan-results.sarif` | File to write the report to. |
-| `output_formats` | string | | Comma-separated `format=path` pairs, all rendered from one scan. Cannot be combined with `output_format` or `output_file`. See [Multiple report formats](#multiple-report-formats). |
+| `output` | string | `sarif=grype-scan-results.sarif` | Comma-separated `format` or `format=file` entries, in Grype's `-o` syntax. See [Reports](#reports). |
 
 ## 📚 Guides
 
@@ -207,24 +198,21 @@ temporary opt-out.
 
 ### Scan sources and policy
 
-`scan_image` retains its original `image` parameter for backward
-compatibility. New configurations can use the more accurately named `source`
-parameter with any source syntax supported by Grype, including `cpes:` files
-and `zarf:` package archives. Set exactly one of `source` or `image`.
+`source` takes any source syntax supported by Grype: an image reference, or
+an explicit scheme such as `sbom:`, `dir:` or `registry:`, including `cpes:`
+files and `zarf:` package archives.
 
 ```yaml
-- grype/scan_image:
+- grype/scan:
     source: sbom:./forge.cdx.json
     config: .grype.yaml
     only_fixed: true
     fail_on: high
-    output_format: sarif
-    output_file: forge.grype.sarif
+    output: sarif=forge.grype.sarif
 
-- grype/scan_image:
+- grype/scan:
     source: dir:.
-    output_format: json
-    output_file: repository.grype.json
+    output: json=repository.grype.json
 ```
 
 The `config` parameter is passed to Grype as `--config`, allowing a committed
@@ -243,13 +231,12 @@ count toward `fail_on`. `affected` and `under_investigation` statements filter
 nothing.
 
 ```yaml
-- grype/scan_image:
+- grype/scan:
     source: sbom:./forge.cdx.json
     config: .grype.yaml
     vex: vex/forge.openvex.json,vex/release-1.4.openvex.json
     fail_on: high
-    output_format: json
-    output_file: forge.grype.json
+    output: json=forge.grype.json
 ```
 
 Behavior verified against Grype 0.119.0, the default version:
@@ -274,31 +261,48 @@ Behavior verified against Grype 0.119.0, the default version:
   image as a `pkg:oci` purl with its digest also applies, with the package
   purl listed as a subcomponent.
 
-### Multiple report formats
+### Reports
 
-`output_formats` renders several reports from a single scan, so every report
-comes from the same cataloging pass and the same vulnerability database
-snapshot. Separate scans could each pick up a database update, and they repeat
-the image pull and cataloging work. List comma-separated `format=path` pairs;
-each becomes its own `-o format=path` flag:
+`output` uses Grype's own `-o` syntax: a comma-separated list of entries, each
+`format` or `format=file`. The formats are `json`, `table`, `cyclonedx`,
+`cyclonedx-json`, `sarif` and `template`. An entry with a file writes that
+report to the file, creating its parent directories; the file may itself
+contain `=`, since only the first one separates the format. An entry without
+a file prints the report in the step log, so at most one entry can leave out
+the file. The default, `sarif=grype-scan-results.sarif`, writes one SARIF
+report.
 
 ```yaml
-- grype/scan_image:
+# One JSON report, in a directory that is created if needed.
+- grype/scan:
     source: sbom:./forge.cdx.json
-    output_formats: json=forge.grype.json,table=forge.grype.txt
+    output: json=reports/forge.grype.json
+
+# A JSON and a SARIF file, plus a table in the step log, from one scan.
+- grype/scan:
+    source: sbom:./forge.cdx.json
+    output: json=forge.grype.json,sarif=forge.grype.sarif,table
 ```
 
-`output_formats` requires Grype 0.104.1 or later; the default version
-qualifies. Older releases either lack multiple outputs (before 0.64.0) or can
-write registry credentials into JSON written straight to a file (0.68.0 through
-0.104.0, [GHSA-6gxw-85q2-q646](https://github.com/anchore/grype/security/advisories/GHSA-6gxw-85q2-q646)),
-so the step fails before scanning on them. The single-report style is
-unaffected on any version, because it redirects Grype's stdout to the file.
+A single entry works with every Grype version: Grype prints the report on
+stdout, and the orb redirects it to the file.
 
-`output_formats` cannot be combined with `output_format` or `output_file`.
-Without it, the single-report behavior is unchanged: `output_format` defaults
-to `sarif` and `output_file` to `grype-scan-results.sarif`. When `fail_on`
-trips, every report is still written before the step fails.
+Several entries render every report from a single scan, so they all come from
+the same cataloging pass and the same vulnerability database snapshot.
+Separate scans could each pick up a database update, and they repeat the image
+pull and cataloging work. Each entry becomes its own `-o` flag, and Grype
+writes the files itself. This needs Grype 0.104.1 or later; the default
+version qualifies. Older releases either lack multiple outputs (before 0.64.0)
+or can write registry credentials into JSON written straight to a file (0.68.0
+through 0.104.0, [GHSA-6gxw-85q2-q646](https://github.com/anchore/grype/security/advisories/GHSA-6gxw-85q2-q646)),
+so the step fails before scanning on them.
+
+The `template` format also needs a Go template file, which `output` cannot
+name. Set it with `output-template-file` in the Grype configuration file
+passed as `config`, or with the `GRYPE_OUTPUT_TEMPLATE_FILE` environment
+variable.
+
+When `fail_on` trips, every report is still written before the step fails.
 
 ## 🔐 Security
 
@@ -328,7 +332,31 @@ access to these hosts:
 | `objects.githubusercontent.com` | GitHub's previous redirect host for release downloads. Allow it too, so installs keep working if a download is routed there. |
 | `grype.anchore.io` | Vulnerability database updates on Grype 0.88.0 and later, including the default version. Both the database listing and the database archive are served from this host. |
 | `toolbox-data.anchore.io` | Vulnerability database updates on Grype 0.87.0 and earlier, and the update check Grype runs at startup on every version. If this host is blocked, the check logs an error and the scan continues. Set `GRYPE_CHECK_FOR_APP_UPDATE=false` to skip it. |
-| Your registries | Any registries your `scan_image` sources pull images from. |
+| Your registries | Any registries your `scan` sources pull images from. |
+
+## ⬆️ Upgrading
+
+The next release renames or removes these commands and parameters:
+
+| Old | New |
+| --- | --- |
+| `scan_image` command | `scan` |
+| `scan_image.image` | `source`, which is now required |
+| `scan_image.output_format` + `output_file` | `output: <format>=<file>` |
+| `scan_image.output_formats` | `output`, with the same comma-separated `format=file` list |
+| `log_version` command | removed; `install` already logs the version |
+| `update_database.database_path` | `database_dir` |
+
+Behavior changes:
+
+- `output` can also print a report in the step log: an entry without
+  `=file`, such as `output: table`.
+- Parent directories of `output` files are created.
+- `database_dir` defaults to `~/.cache/grype/db` (it was
+  `/home/circleci/.cache/grype/db`, the same directory on CircleCI's images).
+  It is exported as `GRYPE_DB_CACHE_DIR` to the job's later steps, so `scan`
+  and `grype db list` now use a non-default directory too.
+- The `GRYPE_VERSION` environment variable is no longer exported.
 
 ## 🎨 Logos
 

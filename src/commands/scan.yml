@@ -1,0 +1,60 @@
+description: Scans a container image, SBOM, directory, or other Grype source.
+parameters:
+  fail_on:
+    type: enum
+    enum: ["", "negligible", "low", "medium", "high", "critical"]
+    default: ""
+    description: >
+      Exits with error code 2 if a vulnerability is found at or above the
+      supplied severity level. Grype 0.91.0 and earlier exit with error code 1.
+  source:
+    type: string
+    description: >
+      Required. Grype source to scan: an image reference, or a source with an
+      explicit scheme such as sbom:, dir:, registry:, docker:, oci-dir:,
+      cpes:, or zarf:. Environment variables are expanded, and the step fails
+      if the result is empty.
+  config:
+    type: string
+    default: ""
+    description: Optional Grype configuration file passed with --config.
+  only_fixed:
+    type: boolean
+    default: false
+    description: When true, report only vulnerabilities that have a fix.
+  vex:
+    type: string
+    default: ""
+    description: >
+      Optional comma-separated list of OpenVEX document paths, each passed to
+      Grype as its own --vex flag. A path that does not exist fails the step.
+      Matches marked not_affected or fixed are moved to ignoredMatches and do
+      not count toward fail_on. When set, these documents replace (rather
+      than add to) any vex-documents listed in the config file.
+  output:
+    type: string
+    default: "sarif=grype-scan-results.sarif"
+    description: >
+      Reports to write, in Grype's own -o syntax: a comma-separated list of
+      entries, each "format" or "format=file", such as
+      "sarif=scan.sarif,table". Formats are json, table, cyclonedx,
+      cyclonedx-json, sarif and template; template also needs a template
+      file, set with output-template-file in the Grype config file (or with
+      GRYPE_OUTPUT_TEMPLATE_FILE). An entry with a file writes the report to
+      that file (parent directories are created, and the file path may itself
+      contain "="). An entry without a file prints the report in the step log
+      (stdout); at most one entry may omit a file. A single entry works with
+      any Grype version. Several entries are rendered from one scan and
+      require Grype 0.104.1 or later. Environment variables are expanded.
+      Defaults to a SARIF report in grype-scan-results.sarif.
+steps:
+  - run:
+      name: Scan with Grype
+      environment:
+        PARAM_FAIL_ON: << parameters.fail_on >>
+        PARAM_CONFIG: << parameters.config >>
+        PARAM_ONLY_FIXED: << parameters.only_fixed >>
+        PARAM_OUTPUT: << parameters.output >>
+        PARAM_SOURCE: << parameters.source >>
+        PARAM_VEX: << parameters.vex >>
+      command: << include(scripts/scan.sh) >>

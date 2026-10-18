@@ -1,19 +1,23 @@
 description: >
-  The `install` command is used to simplify installation of Grype.
+  Install Grype, update its vulnerability database, and scan a container
+  image, writing a SARIF report to a file and a table to the step log.
 
 usage:
   version: 2.1
   orbs:
     grype: juburr/grype-orb@latest
   jobs:
-    publish-chart:
+    vulnerability-scan:
       docker:
         - image: cimg/base:current-22.04
       steps:
         - grype/install
-        - grype/log_version
         - grype/update_database
+        - grype/scan:
+            source: gcr.io/distroless/base:latest
+            fail_on: high
+            output: sarif=reports/distroless-base.sarif,table
   workflows:
     use-my-orb:
       jobs:
-        - publish-chart
+        - vulnerability-scan
