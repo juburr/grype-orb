@@ -172,7 +172,7 @@ jobs:
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
 | `source` | string | *required* | Any Grype source: an image reference, or a scheme such as `sbom:`, `dir:`, `registry:`, `docker:`, `oci-dir:`, `cpes:`, or `zarf:`. |
-| `fail_on` | enum | | `negligible`, `low`, `medium`, `high`, or `critical`. Fails the step when a vulnerability at or above this severity is found. Leave empty to report without gating. |
+| `fail_on` | enum | `never` | `critical`, `high`, `medium`, `low`, `negligible`, or `never`. Fails the step when a vulnerability at or above this severity is found. `never` reports without gating. |
 | `only_fixed` | boolean | `false` | Report only vulnerabilities that have a fix. |
 | `config` | string | | Grype configuration file, passed as `--config`. |
 | `vex` | string | | Comma-separated OpenVEX document paths. See [VEX](#vex). |
@@ -357,6 +357,9 @@ Behavior changes:
   It is exported as `GRYPE_DB_CACHE_DIR` to the job's later steps, so `scan`
   and `grype db list` now use a non-default directory too.
 - The `GRYPE_VERSION` environment variable is no longer exported.
+- `fail_on` is turned off with `never`, its new default, as in the other
+  juburr scanner orbs. An empty `fail_on: ""` is no longer accepted; drop it
+  or use `never`.
 
 ## 🎨 Logos
 

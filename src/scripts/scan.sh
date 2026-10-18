@@ -111,9 +111,14 @@ echo "  OUTPUT: ${OUTPUT}"
 echo "  VEX: ${VEX:-<none>}"
 
 FAIL_ARG=()
-if [[ -n "${FAIL_ON}" ]]; then
-    FAIL_ARG=(--fail-on "${FAIL_ON}")
-fi
+case "${FAIL_ON}" in
+    never) ;;
+    negligible|low|medium|high|critical) FAIL_ARG=(--fail-on "${FAIL_ON}") ;;
+    *)
+        echo "ERROR: fail_on must be critical, high, medium, low, negligible, or never; got '${FAIL_ON}'." >&2
+        exit 2
+        ;;
+esac
 
 CONFIG_ARG=()
 if [[ -n "${CONFIG}" ]]; then
