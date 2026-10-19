@@ -39,6 +39,7 @@ workflows:
       - orb-tools/pack:
           filters: *filters
       - orb-tools/review:
+          orb_name: grype
           filters: *filters
       - shellcheck/check:
           filters: *filters

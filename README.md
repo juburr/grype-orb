@@ -103,7 +103,7 @@ Add the orb, install Grype, and scan. The job below fails if the image has any v
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@0.6.0
+  grype: juburr/grype-orb@1.0.0
 
 jobs:
   vulnerability_scan:
@@ -131,7 +131,7 @@ Swap in your image, push, and the SARIF report shows up under the job's **Artifa
 CircleCI has no `latest` tag for registry orbs, so pin a release. The orb version badge above shows the newest one.
 
 > [!TIP]
-> Upgrading from `scan_image`? The next release renames it and several of its parameters. See [Upgrading](#-upgrading).
+> Upgrading from `scan_image`? v1.0.0 renames it and several of its parameters. See [Upgrading](#-upgrading).
 
 > [!NOTE]
 > `fail_on` defaults to `never`, which reports findings without failing the job. Set a severity to gate the build.
@@ -215,7 +215,7 @@ Pin the executor image and the Grype release with pipeline parameters, so neithe
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@0.6.0
+  grype: juburr/grype-orb@1.0.0
 
 parameters:
   cimg_base_version:
@@ -313,7 +313,7 @@ Environment variables are expanded in `install`'s `version` and `install_path`, 
 
 ## 📦 Upgrading
 
-The next release renames or removes these commands and parameters:
+v1.0.0 renames or removes these commands and parameters:
 
 | Old | New |
 | --- | --- |
@@ -371,7 +371,7 @@ The `install` command checks the Grype binary from the downloaded release agains
 The table covers the default `version` and earlier releases, back to Grype 0.1.0 on amd64 and 0.24.0 on arm64. If you pin a Grype release newer than this orb knows about, `strict` fails until the orb is upgraded. Upgrade the orb or [contribute the checksum](#-contributing); set `verify_checksums: known_versions` only as a temporary opt-out.
 
 > [!WARNING]
-> **Changed in the next release:** the default was previously `known_versions`, which installed unlisted versions without verification. Pipelines that pin a Grype version newer than the orb's table now fail until they upgrade the orb or set `verify_checksums: known_versions` explicitly.
+> **Changed in v1.0.0:** the default was previously `known_versions`, which installed unlisted versions without verification. Pipelines that pin a Grype version newer than the orb's table now fail until they upgrade the orb or set `verify_checksums: known_versions` explicitly.
 
 ## 🌐 Network Access
 
