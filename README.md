@@ -354,7 +354,7 @@ Linux executors on `x86_64` (amd64) and `aarch64`/`arm64` (arm64), on Docker or 
 
 Linux arm64 builds were first published in Grype 0.24.0, so arm64 executors need that release or later.
 
-`install` needs bash 4 or newer, `mktemp`, `tar`, `gzip`, and `curl` or `wget`, plus `sha512sum` when it verifies. CircleCI's `cimg` and machine images have all of them.
+`install` needs bash 4 or newer, `curl` or `wget`, `awk`, `tar`, `gzip`, and the standard coreutils, including `mktemp` and, when it verifies, `sha512sum`. CircleCI's `cimg` and machine images have all of them.
 
 The download cache is keyed by Grype version, executor architecture and home directory, so amd64 and arm64 jobs never share a cached binary. On executors whose `PATH` doesn't already include `install_path` (for example, machine executors), `install` adds it for later steps through `BASH_ENV`.
 
@@ -399,7 +399,7 @@ Optional hosts. Grype carries on without them:
 This is an unofficial, community-maintained orb, and contributions are welcome! Bug reports, feature ideas and pull requests all help.
 
 - **Found a bug or have an idea?** [Open an issue](https://github.com/juburr/grype-orb/issues).
-- **Need a newer Grype release?** Generate its checksums with `src/scripts/install_hash.sh -v <version>`, paste them into the `sha512sums` table in [`src/scripts/install.sh`](src/scripts/install.sh), and open a pull request. The script prints entries for both architectures after checking each asset against `grype_<version>_checksums.txt`, the SHA-256 list Grype publishes with each release, and needs `cosign` to verify that list's keyless Sigstore signature for releases from 0.72.0 on. It also needs bash 4 or newer, `mktemp`, `curl`, `sha256sum`, `sha512sum`, `tar` and `gzip`. For a release with nothing published to check against, `-c` takes a checksum from another official source (a SHA-1 one also needs `sha1sum`), or `NONE`; it never overrides what the release did publish.
+- **Need a newer Grype release?** Generate its checksums with `src/scripts/install_hash.sh -v <version>`, paste them into the `sha512sums` table in [`src/scripts/install.sh`](src/scripts/install.sh), and open a pull request. The script prints entries for both architectures after checking each asset against `grype_<version>_checksums.txt`, the SHA-256 list Grype publishes with each release, and needs `cosign` to verify that list's keyless Sigstore signature for releases from 0.72.0 on. It also needs bash 4 or newer, `curl`, `awk`, `sed`, `tar`, `gzip` and the standard coreutils, including `mktemp`, `sha256sum` and `sha512sum`. For a release with nothing published to check against, `-c` takes a checksum from another official source (a SHA-1 one also needs `sha1sum`), or `NONE`; it never overrides what the release did publish.
 - **Before opening a pull request**, run the checks CI runs. The tests run offline, with stand-ins for `grype` and the downloads they need; `circleci orb validate` checks the packed orb against the CircleCI API, so it needs network access. CI also runs integration tests on amd64 and arm64.
 
   ```bash
