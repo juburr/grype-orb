@@ -354,6 +354,8 @@ Linux executors on `x86_64` (amd64) and `aarch64`/`arm64` (arm64), on Docker or 
 
 Linux arm64 builds were first published in Grype 0.24.0, so arm64 executors need that release or later.
 
+`install` needs bash 4 or newer, `mktemp`, `tar`, `gzip`, and `curl` or `wget`, plus `sha512sum` when it verifies. CircleCI's `cimg` and machine images have all of them.
+
 The download cache is keyed by Grype version, executor architecture and home directory, so amd64 and arm64 jobs never share a cached binary. On executors whose `PATH` doesn't already include `install_path` (for example, machine executors), `install` adds it for later steps through `BASH_ENV`.
 
 ## 🔐 Checksum Verification
