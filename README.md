@@ -293,7 +293,7 @@ Downloads the latest vulnerability database into `database_dir` with `grype db u
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `caching` | `true` | Cache the vulnerability database. Each job restores the newest database saved for its home directory, `database_dir` and Grype schema, and Grype skips the download when that database is still current. A job that downloads a newer database saves it under a key naming that database (its schema, build time and source), so there is one cache per database Anchore publishes, kept for your project's cache retention period. Recommended, because Anchore's database host can be slow or fail at peak hours. |
+| `caching` | `true` | Cache the vulnerability database. Each job restores the newest database built today, or else on one of the two days before, saved for its home directory, `database_dir` (with the working directory, when it's relative), Grype schema and database feed, and Grype skips the download when that database is still current. A job that downloads a newer database saves it under a key naming that database and its build date, so there is one cache per database Anchore publishes, kept for your project's cache retention period, and a job that saves an older database late can't replace a newer one in later restores. Recommended, because Anchore's database host can be slow or fail at peak hours. |
 | `database_dir` | `~/.cache/grype/db` | Directory for the database. A leading `~` is expanded to `$HOME`, and a relative path is resolved against the working directory. It is exported as `GRYPE_DB_CACHE_DIR` to the job's later steps, so `scan` and `grype db list` use the same database. With caching, the cache steps expand `~` but not environment variables. |
 
 ### `grype/scan`
@@ -315,7 +315,7 @@ Environment variables are expanded in `install`'s `version` and `install_path`, 
 
 ### From 1.0.0 to 1.0.1
 
-No configuration changes are needed. `update_database` fixes its cache: v1.0.0 saved the database under one fixed key, and CircleCI never replaces a saved cache, so every job restored the first database ever saved and then downloaded a new one anyway. Each job now restores the newest database saved for its home directory, `database_dir` and Grype schema, and a job that downloads a newer database saves it under a key naming that database. The old `grype-vuln-db-cache-v1` cache is no longer restored and expires with your project's cache retention.
+No configuration changes are needed. `update_database` fixes its cache: v1.0.0 saved the database under one fixed key, and CircleCI never replaces a saved cache, so every job restored the first database ever saved and then downloaded a new one anyway. Each job now restores the newest database built today, or on one of the two days before, saved for the same home directory, `database_dir`, Grype schema and database feed. A job that downloads a newer database saves it under a key naming that database and its build date. The old `grype-vuln-db-cache-v1` cache is no longer restored and expires with your project's cache retention.
 
 ### From 0.x to 1.0.0
 

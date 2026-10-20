@@ -42,17 +42,22 @@ jobs:
             # The keys of the cache steps are computed from these files: the
             # location, and the database the job ended up with.
             schema=$(grype version | awk -F: '/^Supported DB Schema:/ { gsub(/[[:space:]]/, "", $2); print $2 }')
-            printf '%s\n%s\n%s\n' "${HOME}" '~/.cache/grype/db' "${schema}" | cmp - /tmp/grype-orb-db-cache-location
+            printf '%s\n%s\n\n%s\n%s\n' "${HOME}" '~/.cache/grype/db' "${schema}" \
+              https://grype.anchore.io/databases | cmp - /tmp/grype-orb-db-cache-location
             cat /tmp/grype-orb-db-cache-database
             built=$(grype db status | awk '/^[[:space:]]*Built:/ { $1 = ""; sub(/^ /, ""); print }')
             grep -qxF "Built: ${built}" /tmp/grype-orb-db-cache-database
+            test "$(cat /tmp/grype-orb-db-cache-built)" = "${built:0:10}"
             cp /tmp/grype-orb-db-cache-database /tmp/first-db-cache-database
+            cp /tmp/grype-orb-db-cache-built /tmp/first-db-cache-built
       # A second update restores the database the first one just saved, finds
       # it current, and keys it the same, so the save is skipped.
       - grype-orb/update_database
       - run:
           name: Verify the Restored Database Keeps Its Key
-          command: cmp /tmp/first-db-cache-database /tmp/grype-orb-db-cache-database
+          command: |
+            cmp /tmp/first-db-cache-database /tmp/grype-orb-db-cache-database
+            cmp /tmp/first-db-cache-built /tmp/grype-orb-db-cache-built
       - grype-orb/scan:
           source: gcr.io/distroless/base:latest
           output: json=distroless.base.scan.json

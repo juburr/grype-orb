@@ -7,11 +7,12 @@ parameters:
     default: true
     description: >
       Cache the vulnerability database between jobs. Each job restores the
-      newest database saved for its home directory, database_dir and Grype
-      schema, and skips the download when that database is still current.
-      A job that downloads a newer database saves it under a key naming
-      that database. Recommended, because Anchore's database host can be
-      slow or fail at peak hours.
+      newest database built today, or else on one of the two days before,
+      saved for its home directory, database_dir, Grype schema and database
+      feed, and skips the download when that database is still current. A
+      job that downloads a newer database saves it under a key naming that
+      database. Recommended, because Anchore's database host can be slow or
+      fail at peak hours.
   database_dir:
     type: string
     default: "~/.cache/grype/db"
@@ -28,18 +29,22 @@ steps:
       condition: << parameters.caching >>
       steps:
         # A saved cache is never replaced, so the database is saved under a
-        # key naming the database itself, and the newest one saved for this
-        # location is restored (see scripts/database_cache_key.sh). v1 used
-        # one fixed key, which froze the cache at the first database saved.
+        # key naming the database and its build date, and the newest database
+        # built today, then on the two days before, then any is restored (see
+        # scripts/database_cache_key.sh). v1 used one fixed key, which froze
+        # the cache at the first database saved.
         - run:
             name: Prepare vulnerability database cache location
             environment:
               PARAM_DATABASE_DIR: << parameters.database_dir >>
               ORB_DB_CACHE_KEY_PART: location
-              ORB_DB_CACHE_KEY_FILE: /tmp/grype-orb-db-cache-location
+              ORB_DB_CACHE_KEY_PREFIX: /tmp/grype-orb-db-cache
             command: << include(scripts/database_cache_key.sh) >>
         - restore_cache:
             keys:
+              - grype-vuln-db-v2-{{ checksum "/tmp/grype-orb-db-cache-location" }}-{{ checksum "/tmp/grype-orb-db-cache-day0" }}-
+              - grype-vuln-db-v2-{{ checksum "/tmp/grype-orb-db-cache-location" }}-{{ checksum "/tmp/grype-orb-db-cache-day1" }}-
+              - grype-vuln-db-v2-{{ checksum "/tmp/grype-orb-db-cache-location" }}-{{ checksum "/tmp/grype-orb-db-cache-day2" }}-
               - grype-vuln-db-v2-{{ checksum "/tmp/grype-orb-db-cache-location" }}-
   - run:
       name: Update Vulnerability Database
@@ -53,10 +58,10 @@ steps:
             name: Prepare vulnerability database cache key
             environment:
               ORB_DB_CACHE_KEY_PART: database
-              ORB_DB_CACHE_KEY_FILE: /tmp/grype-orb-db-cache-database
+              ORB_DB_CACHE_KEY_PREFIX: /tmp/grype-orb-db-cache
             command: << include(scripts/database_cache_key.sh) >>
         - save_cache:
-            key: grype-vuln-db-v2-{{ checksum "/tmp/grype-orb-db-cache-location" }}-{{ checksum "/tmp/grype-orb-db-cache-database" }}
+            key: grype-vuln-db-v2-{{ checksum "/tmp/grype-orb-db-cache-location" }}-{{ checksum "/tmp/grype-orb-db-cache-built" }}-{{ checksum "/tmp/grype-orb-db-cache-database" }}
             paths:
               - << parameters.database_dir >>
   - run:

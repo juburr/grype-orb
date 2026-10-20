@@ -1,49 +1,88 @@
 #!/bin/bash
 #
-# Writes one of the two files the update_database cache keys are computed
-# from. CircleCI never replaces a saved cache, so the database is saved under
-# a key naming the database itself, and restored from the newest cache saved
-# for the same location:
+# Writes the files the update_database cache keys are computed from, named
+# ${ORB_DB_CACHE_KEY_PREFIX}-<name>. CircleCI never replaces a saved cache,
+# so the database is saved under a key naming the database itself:
 #
-#   location (before the restore): HOME and database_dir as given, since a
-#     cache is restored to the absolute path it was saved from, and the
-#     database schema the installed Grype reads, so Grype releases with
-#     different schemas never trade databases;
-#   database (after the update): the schema, build time and source of the
-#     database now in database_dir, from `grype db status`. A job that
-#     downloaded a newer database saves it under a new key, and a job that
-#     found the restored database current saves nothing.
+#   location, before the restore: HOME and database_dir as given, since a
+#     cache is restored to the absolute path it was saved from, the working
+#     directory when database_dir is relative to it, the database schema the
+#     installed Grype reads, and the feed it updates from, so jobs with
+#     different databases never trade them;
+#   day0, day1 and day2, before the restore: today's date in UTC and the two
+#     days before;
+#   built and database, after the update: the build date of the database now
+#     in database_dir, and its schema, build time and source from
+#     `grype db status`.
+#
+# The save key is location, built and database, and the restore tries today's
+# build date first, then the two days before, then any. CircleCI restores the
+# newest cache saved under a prefix, so a job that saves an older database
+# late can never outrank a newer one saved earlier. A job that found its
+# restored database current saves nothing, since its key already exists.
 #
 # Parameters arrive as ORB_DB_CACHE_KEY_PART (location or database),
-# ORB_DB_CACHE_KEY_FILE and, for location, PARAM_DATABASE_DIR.
+# ORB_DB_CACHE_KEY_PREFIX and, for location, PARAM_DATABASE_DIR.
 
 set -euo pipefail
 
-# The file is written under a new name and renamed into place, so a file or
+prefix=${ORB_DB_CACHE_KEY_PREFIX}
+tmps=()
+trap 'rm -f ${tmps[@]+"${tmps[@]}"}' EXIT
+
+# write_key NAME CONTENT: writes CONTENT and a newline to ${prefix}-NAME. The
+# file is written under a new name and renamed into place, so a file or
 # symlink someone else left at its name in a shared /tmp is never written
 # through. mv would move it into a directory, so that is refused.
-tmp=$(mktemp "${ORB_DB_CACHE_KEY_FILE}.XXXXXX")
-trap 'rm -f "${tmp}"' EXIT
+write_key() {
+    local file="${prefix}-$1" tmp
+    tmp=$(mktemp "${file}.XXXXXX")
+    tmps+=("${tmp}")
+    printf '%s\n' "$2" > "${tmp}"
+    if [[ -d "${file}" ]] || ! mv -f "${tmp}" "${file}"; then
+        echo "ERROR: Could not write ${file}." >&2
+        exit 1
+    fi
+}
 
 case "${ORB_DB_CACHE_KEY_PART}" in
     location)
         # database_dir as given: the cache steps expand ~ but not environment
-        # variables, so the raw value names the directory they save.
+        # variables, so the raw value names the directory they save. A
+        # relative one is saved from the working directory.
+        dir=${PARAM_DATABASE_DIR:-}
+        workdir=""
+        if [[ -n "${dir}" && "${dir}" != /* && "${dir}" != \~ && "${dir}" != \~/* ]]; then
+            workdir=${PWD}
+        fi
         schema=$({ grype version 2> /dev/null || true; } | awk -F: '/^Supported DB Schema:/ { gsub(/[[:space:]]/, "", $2); print $2 }')
-        printf '%s\n%s\n%s\n' "${HOME:-}" "${PARAM_DATABASE_DIR:-}" "${schema}" > "${tmp}"
-        echo "Database cache location: ${PARAM_DATABASE_DIR:-} (schema ${schema:-unknown})."
+        # The effective db.update-url, from the config files and environment
+        # (grype config --load needs Grype 0.78.0 or later).
+        feed=$({ grype config --load 2> /dev/null || true; } | awk '/^[[:space:]]*update-url:/ { print $2; exit }')
+        feed=${feed:-${GRYPE_DB_UPDATE_URL:-}}
+        write_key location "$(printf '%s\n%s\n%s\n%s\n%s' "${HOME:-}" "${dir}" "${workdir}" "${schema}" "${feed}")"
+        now=$(date -u +%s)
+        for day in 0 1 2; do
+            write_key "day${day}" "$(date -u -d "@$((now - day * 86400))" +%Y-%m-%d)"
+        done
+        echo "Database cache location: ${dir}${workdir:+ in ${workdir}} (schema ${schema:-unknown}, feed ${feed:-default})."
         ;;
     database)
         # Path and Status are left out: the location already covers the path,
         # and the status is not part of the database.
         identity=$({ grype db status 2> /dev/null || true; } \
             | awk '/^[[:space:]]*(Schema|Built|From|Checksum):/ { $1 = $1; print }')
+        built=$(printf '%s\n' "${identity}" | awk '/^Built: / { print substr($0, 8, 10); exit }')
         if [[ -z "${identity}" ]]; then
             identity="date $(date -u +%Y-%m-%d)"
             echo "WARN: grype db status named no database; keying the cache by today's date instead." >&2
         fi
-        printf '%s\n' "${identity}" > "${tmp}"
-        echo "Database cache key names:"
+        if [[ ! "${built}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            built=$(date -u +%Y-%m-%d)
+        fi
+        write_key built "${built}"
+        write_key database "${identity}"
+        echo "Database cache key names the database built on ${built}:"
         printf '%s\n' "${identity}" | sed 's/^/  /'
         ;;
     *)
@@ -51,8 +90,3 @@ case "${ORB_DB_CACHE_KEY_PART}" in
         exit 1
         ;;
 esac
-
-if [[ -d "${ORB_DB_CACHE_KEY_FILE}" ]] || ! mv -f "${tmp}" "${ORB_DB_CACHE_KEY_FILE}"; then
-    echo "ERROR: Could not write ${ORB_DB_CACHE_KEY_FILE}." >&2
-    exit 1
-fi
