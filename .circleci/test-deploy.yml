@@ -36,6 +36,13 @@ jobs:
             grype version
             grype version | grep -E '^Platform:[[:space:]]+linux/amd64$'
       - grype-orb/update_database
+      - run:
+          name: Verify the Database Cache Is Keyed by Day
+          command: |
+            # The keys of the cache steps are computed from these files.
+            test "$(cat /tmp/grype-orb-db-cache-date)" = "$(date -u +%Y-%m-%d)"
+            printf '%s\n%s\n' "${HOME}" '~/.cache/grype/db' | cmp - /tmp/grype-orb-db-cache-location
+            grype db status
       - grype-orb/scan:
           source: gcr.io/distroless/base:latest
           output: json=distroless.base.scan.json

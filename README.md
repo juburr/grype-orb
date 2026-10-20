@@ -103,7 +103,7 @@ Add the orb, install Grype, and scan. The job below fails if the image has any v
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@1.0.0
+  grype: juburr/grype-orb@1.0.1
 
 jobs:
   vulnerability_scan:
@@ -215,7 +215,7 @@ Pin the executor image and the Grype release with pipeline parameters, so neithe
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@1.0.0
+  grype: juburr/grype-orb@1.0.1
 
 parameters:
   cimg_base_version:
@@ -293,7 +293,7 @@ Downloads the latest vulnerability database into `database_dir` with `grype db u
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `caching` | `true` | Cache the vulnerability database. Recommended, because Anchore's database host can be slow or fail at peak hours. |
+| `caching` | `true` | Cache the vulnerability database, under a key per day (UTC), home directory and `database_dir`. The first job of the day saves the database it downloaded, later jobs that day restore it and skip the download, and the next day's first job starts from the newest earlier database. Recommended, because Anchore's database host can be slow or fail at peak hours. Each day's cache is kept for your project's cache retention period. |
 | `database_dir` | `~/.cache/grype/db` | Directory for the database. A leading `~` is expanded to `$HOME`, and a relative path is resolved against the working directory. It is exported as `GRYPE_DB_CACHE_DIR` to the job's later steps, so `scan` and `grype db list` use the same database. With caching, the cache steps expand `~` but not environment variables. |
 
 ### `grype/scan`
@@ -312,6 +312,12 @@ Scans an image, SBOM, directory or other Grype source, writes reports, and can f
 Environment variables are expanded in `install`'s `version` and `install_path`, `update_database`'s `database_dir`, and `scan`'s `source`, `config`, `vex` and `output`.
 
 ## 📦 Upgrading
+
+### From 1.0.0 to 1.0.1
+
+No configuration changes are needed. `update_database` fixes its cache: v1.0.0 saved the database under one fixed key, and CircleCI never replaces a saved cache, so every job restored the first database ever saved and then downloaded a new one anyway. The cache is now keyed per day (UTC), home directory and `database_dir`. The old `grype-vuln-db-cache-v1` cache is no longer restored and expires with your project's cache retention.
+
+### From 0.x to 1.0.0
 
 v1.0.0 renames or removes these commands and parameters:
 
