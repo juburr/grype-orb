@@ -44,7 +44,7 @@ case "${ORB_DB_CACHE_KEY_PART}" in
         fi
         printf '%s\n' "${identity}" > "${tmp}"
         echo "Database cache key names:"
-        printf '  %s\n' "${identity}"
+        printf '%s\n' "${identity}" | sed 's/^/  /'
         ;;
     *)
         echo "ERROR: ORB_DB_CACHE_KEY_PART must be location or database, got '${ORB_DB_CACHE_KEY_PART}'." >&2
