@@ -6,13 +6,11 @@ parameters:
     type: boolean
     default: true
     description: >
-      Cache the vulnerability database between jobs. Each job restores the
-      newest database built today, or else on one of the two days before,
-      saved for its home directory, database_dir, Grype schema and database
-      feed, and skips the download when that database is still current. A
-      job that downloads a newer database saves it under a key naming that
-      database. Recommended, because Anchore's database host can be slow or
-      fail at peak hours.
+      Cache the vulnerability database between jobs. Jobs reuse the cached
+      database until Anchore publishes a newer one, and the first job to
+      download it caches it for the rest. Recommended, because Anchore's
+      database host can be slow or fail at peak hours. Each cached database
+      takes about 500 MiB of cache storage, roughly one a day.
   database_dir:
     type: string
     default: "~/.cache/grype/db"

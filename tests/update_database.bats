@@ -172,6 +172,17 @@ CONFIG_V6=$'db:\n  cache-dir: \'/home/circleci/.cache/grype/db\'\n  update-url: 
     [ "$(sed -n 5p "${KEYS}-location")" = "https://mirror.example/listing.json" ]
 }
 
+@test "credentials in the feed stay out of the location key, and the log shows no query" {
+    grype_stub 'Supported DB Schema: 6' "${STATUS_V6}" $'db:\n  update-url: \'https://user:s3cret@mirror.example/databases?token=t0ken\''
+
+    key_files location
+
+    [ "${status}" -eq 0 ]
+    [ "$(sed -n 5p "${KEYS}-location")" = "https://mirror.example/databases?token=t0ken" ]
+    [[ "${output}" == *"feed https://mirror.example/databases)."* ]]
+    [[ "${output}" != *s3cret* && "${output}" != *t0ken* ]]
+}
+
 @test "the day keys name today and the two days before in UTC" {
     grype_stub 'Supported DB Schema: 6' "${STATUS_V6}" "${CONFIG_V6}"
     now=$(date -u +%s)
@@ -199,6 +210,27 @@ CONFIG_V6=$'db:\n  cache-dir: \'/home/circleci/.cache/grype/db\'\n  update-url: 
     # A bare "! grep" line can't fail a bats test, so test the count.
     [ "$(grep -cE '^(Path|Status):' "${KEYS}-database")" -eq 0 ]
     [ "$(cat "${KEYS}-built")" = "2026-10-19" ]
+}
+
+@test "the database key keeps only the From URL's checksum, without credentials or signatures" {
+    signed() {
+        printf '%s\n' "${STATUS_V6}" | sed "s|^From: .*|From:      https://user:s3cret@mirror.example/v6/db.tar.zst?X-Amz-Signature=$1\\&checksum=sha256%3A13a1\\&X-Amz-Expires=60|"
+    }
+    grype_stub 'Supported DB Schema: 6' "$(signed aaa)" "${CONFIG_V6}"
+    key_files database
+    [ "${status}" -eq 0 ]
+    [ "$(sed -n 3p "${KEYS}-database")" = "From: https://mirror.example/v6/db.tar.zst?checksum=sha256%3A13a1" ]
+    [[ "${output}" != *s3cret* && "${output}" != *Signature* ]]
+    first=$(cat "${KEYS}-database")
+
+    # Another job downloading the same database through a new signed URL.
+    grype_stub 'Supported DB Schema: 6' "$(signed bbb)" "${CONFIG_V6}"
+    key_files database
+    [ "$(cat "${KEYS}-database")" = "${first}" ]
+
+    grype_stub 'Supported DB Schema: 6' "$(printf '%s\n' "${STATUS_V6}" | sed 's|?checksum=.*||')" "${CONFIG_V6}"
+    key_files database
+    [ "$(sed -n 3p "${KEYS}-database")" = "From: https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.10_2026-10-19T00:32:50Z_1792391955.tar.zst" ]
 }
 
 @test "a build date key matches the day key for that date byte for byte" {

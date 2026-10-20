@@ -63,18 +63,38 @@ case "${ORB_DB_CACHE_KEY_PART}" in
         feed=${feed#[\"\']}
         feed=${feed%[\"\']}
         feed=${feed:-${GRYPE_DB_UPDATE_URL:-}}
+        # Credentials in a private feed's URL don't change the feed, so they
+        # stay out of the key, and the log shows no query string either.
+        feed=$(printf '%s\n' "${feed}" | sed -E 's#^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@#\1#')
         write_key location "$(printf '%s\n%s\n%s\n%s\n%s' "${HOME:-}" "${dir}" "${workdir}" "${schema}" "${feed}")"
         now=$(date -u +%s)
         for day in 0 1 2; do
             write_key "day${day}" "$(date -u -d "@$((now - day * 86400))" +%Y-%m-%d)"
         done
-        echo "Database cache location: ${dir}${workdir:+ in ${workdir}} (schema ${schema:-unknown}, feed ${feed:-default})."
+        shown=${feed%%\?*}
+        echo "Database cache location: ${dir}${workdir:+ in ${workdir}} (schema ${schema:-unknown}, feed ${shown:-default})."
         ;;
     database)
         # Path and Status are left out: the location already covers the path,
-        # and the status is not part of the database.
+        # and the status is not part of the database. The From URL keeps only
+        # its checksum parameter and loses any credentials, so a feed that signs
+        # each download URL still gives every job the same key, and the log
+        # shows neither.
         identity=$({ grype db status 2> /dev/null || true; } \
-            | awk '/^[[:space:]]*(Schema|Built|From|Checksum):/ { $1 = $1; print }')
+            | awk '/^[[:space:]]*(Schema|Built|From|Checksum):/ {
+                $1 = $1
+                if ($1 == "From:") {
+                    url = $2
+                    sub(/:\/\/[^\/@]*@/, "://", url)
+                    checksum = ""
+                    if (match(url, /[?&]checksum=[^&]*/)) {
+                        checksum = "?" substr(url, RSTART + 1, RLENGTH - 1)
+                    }
+                    sub(/\?.*/, "", url)
+                    $0 = "From: " url checksum
+                }
+                print
+            }')
         built=$(printf '%s\n' "${identity}" | awk '/^Built: / { print substr($0, 8, 10); exit }')
         if [[ -z "${identity}" ]]; then
             identity="date $(date -u +%Y-%m-%d)"
