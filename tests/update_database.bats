@@ -93,7 +93,8 @@ Schema:    v6.1.10
 Built:     2026-10-19T06:39:15Z
 From:      https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.10_2026-10-19T00:32:50Z_1792391955.tar.zst?checksum=sha256%3A13a1
 Status:    valid'
-CONFIG_V6=$'db:\n  cache-dir: /home/circleci/.cache/grype/db\n  update-url: https://grype.anchore.io/databases\n  auto-update: true'
+# grype config --load prints strings as quoted YAML.
+CONFIG_V6=$'db:\n  cache-dir: \'/home/circleci/.cache/grype/db\'\n  update-url: \'https://grype.anchore.io/databases\'\n  auto-update: true'
 
 @test "the location key names HOME, database_dir, the schema and the feed" {
     grype_stub $'Application:         grype\nSupported DB Schema: 6' "${STATUS_V6}" "${CONFIG_V6}"
@@ -144,6 +145,21 @@ CONFIG_V6=$'db:\n  cache-dir: /home/circleci/.cache/grype/db\n  update-url: http
     grype_stub 'Supported DB Schema: 6' "${STATUS_V6}" "${CONFIG_V6}"
     key_files location
     [ "$(cat "${KEYS}-location")" = "${first}" ]
+}
+
+@test "the feed is the same whether grype config --load quotes it or not" {
+    grype_stub 'Supported DB Schema: 6' "${STATUS_V6}" "${CONFIG_V6}"
+    key_files location
+    [ "${status}" -eq 0 ]
+    [ "$(sed -n 5p "${KEYS}-location")" = "https://grype.anchore.io/databases" ]
+
+    grype_stub 'Supported DB Schema: 6' "${STATUS_V6}" $'db:\n  update-url: "https://grype.anchore.io/databases"'
+    key_files location
+    [ "$(sed -n 5p "${KEYS}-location")" = "https://grype.anchore.io/databases" ]
+
+    grype_stub 'Supported DB Schema: 6' "${STATUS_V6}" $'db:\n  update-url: https://grype.anchore.io/databases'
+    key_files location
+    [ "$(sed -n 5p "${KEYS}-location")" = "https://grype.anchore.io/databases" ]
 }
 
 @test "without grype config --load, the feed comes from GRYPE_DB_UPDATE_URL" {

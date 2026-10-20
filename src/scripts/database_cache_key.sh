@@ -57,8 +57,11 @@ case "${ORB_DB_CACHE_KEY_PART}" in
         fi
         schema=$({ grype version 2> /dev/null || true; } | awk -F: '/^Supported DB Schema:/ { gsub(/[[:space:]]/, "", $2); print $2 }')
         # The effective db.update-url, from the config files and environment
-        # (grype config --load needs Grype 0.78.0 or later).
+        # (grype config --load needs Grype 0.78.0 or later), which prints it
+        # as a quoted YAML string.
         feed=$({ grype config --load 2> /dev/null || true; } | awk '/^[[:space:]]*update-url:/ { print $2; exit }')
+        feed=${feed#[\"\']}
+        feed=${feed%[\"\']}
         feed=${feed:-${GRYPE_DB_UPDATE_URL:-}}
         write_key location "$(printf '%s\n%s\n%s\n%s\n%s' "${HOME:-}" "${dir}" "${workdir}" "${schema}" "${feed}")"
         now=$(date -u +%s)
