@@ -7,7 +7,10 @@ parameters:
     description: >
       Exits with error code 2 if a vulnerability is found at or above the
       supplied severity level. Grype 0.91.0 and earlier exit with error code 1.
-      The default, never, reports vulnerabilities without failing the step.
+      The default, never, passes no threshold to Grype, so it reports
+      vulnerabilities without failing the step unless a fail-on-severity in
+      your Grype config or GRYPE_FAIL_ON_SEVERITY sets one. A severity here
+      overrides both.
   source:
     type: string
     description: >

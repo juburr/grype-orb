@@ -157,7 +157,7 @@ The `config` parameter is passed to Grype as `--config`, allowing a committed po
 
 ## 🚦 Failing the Build
 
-`fail_on` sets the severity line: `critical`, `high`, `medium`, `low`, `negligible` or `never`. When a vulnerability at or above that severity is found, Grype exits with code 2 (Grype 0.91.0 and earlier exit with code 1) and the step fails. The default, `never`, reports findings without gating.
+`fail_on` sets the severity line: `critical`, `high`, `medium`, `low`, `negligible` or `never`. When a vulnerability at or above that severity is found, Grype exits with code 2 (Grype 0.91.0 and earlier exit with code 1) and the step fails. The default, `never`, reports findings without gating. It passes no threshold to Grype, though, so Grype's own setting still applies: a `fail-on-severity` in your Grype config (the `config` file, or a `.grype.yaml` Grype finds by itself) or the `GRYPE_FAIL_ON_SEVERITY` environment variable fails the step at that severity. A severity in `fail_on` overrides both.
 
 - Matches that a [VEX](#-vex) document marks `not_affected` or `fixed`, and matches your `config` file ignores, don't count toward `fail_on`.
 - `only_fixed: true` reports only vulnerabilities that have a fix, so the gate only trips on findings you can act on.
@@ -303,7 +303,7 @@ Scans an image, SBOM, directory or other Grype source, writes reports, and can f
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `source` | *required* | Any Grype source: an image reference, or a scheme such as `sbom:`, `dir:`, `registry:`, `docker:`, `oci-dir:`, `cpes:` or `zarf:`. See [Scan Sources](#-scan-sources). |
-| `fail_on` | `never` | `critical`, `high`, `medium`, `low`, `negligible` or `never`. Fails the step when a vulnerability at or above this severity is found. `never` reports without gating. See [Failing the Build](#-failing-the-build). |
+| `fail_on` | `never` | `critical`, `high`, `medium`, `low`, `negligible` or `never`. Fails the step when a vulnerability at or above this severity is found. `never` reports without gating, unless your Grype config or `GRYPE_FAIL_ON_SEVERITY` sets a threshold. See [Failing the Build](#-failing-the-build). |
 | `only_fixed` | `false` | Boolean. Report only vulnerabilities that have a fix. |
 | `config` | *(empty)* | Grype configuration file, passed as `--config`. |
 | `vex` | *(empty)* | Comma-separated OpenVEX document paths. See [VEX](#-vex). |
