@@ -1,0 +1,62 @@
+name: Scan with Grype
+description: >
+  Scans a container image, SBOM, directory, or other Grype source for
+  vulnerabilities. Run the install action first, and update_database to scan
+  with a fresh, cached database. The GitHub Actions twin of the orb's scan
+  command.
+author: juburr
+
+inputs:
+  config:
+    description: Optional Grype configuration file passed with --config.
+    default: ""
+  fail_on:
+    description: >
+      Fails the step if a vulnerability is found at or above this severity:
+      critical, high, medium, low, negligible, or never. The default, never,
+      passes no threshold to Grype, so it reports vulnerabilities without
+      failing the step unless a fail-on-severity in your Grype config or
+      GRYPE_FAIL_ON_SEVERITY sets one. A severity here overrides both.
+    default: never
+  only_fixed:
+    description: When true, report only vulnerabilities that have a fix.
+    default: "false"
+  output:
+    description: >
+      Reports to write, in Grype's own -o syntax: a comma-separated list of
+      entries, each "format" or "format=file", such as
+      "sarif=scan.sarif,table". Formats are json, table, cyclonedx,
+      cyclonedx-json, sarif and template. An entry with a file writes the
+      report to that file (parent directories are created); an entry without
+      a file prints the report in the step log, and at most one entry may omit
+      a file. Several entries require Grype 0.104.1 or later. Defaults to a
+      SARIF report in grype-scan-results.sarif.
+    default: "sarif=grype-scan-results.sarif"
+  source:
+    description: >
+      Grype source to scan: an image reference, or a source with an explicit
+      scheme such as sbom:, dir:, registry:, docker:, oci-dir:, cpes:, or
+      zarf:. The step fails if it is empty.
+    required: true
+  vex:
+    description: >
+      Optional comma-separated list of OpenVEX document paths, each passed to
+      Grype as its own --vex flag. A path that does not exist fails the step.
+      Matches marked not_affected or fixed are moved to ignoredMatches and do
+      not count toward fail_on. When set, these documents replace any
+      vex-documents listed in the config file.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Scan with Grype
+      shell: bash
+      env:
+        PARAM_CONFIG: ${{ inputs.config }}
+        PARAM_FAIL_ON: ${{ inputs.fail_on }}
+        PARAM_ONLY_FIXED: ${{ inputs.only_fixed }}
+        PARAM_OUTPUT: ${{ inputs.output }}
+        PARAM_SOURCE: ${{ inputs.source }}
+        PARAM_VEX: ${{ inputs.vex }}
+      run: bash "${GITHUB_ACTION_PATH}/../run_script.sh" "${GITHUB_ACTION_PATH}/../../src/scripts/scan.sh"

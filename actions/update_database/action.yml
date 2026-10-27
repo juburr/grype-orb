@@ -1,0 +1,90 @@
+name: Update the Grype vulnerability database
+description: >
+  Updates the Grype vulnerability database in database_dir, and points the
+  job's later steps (such as the scan action) at that directory. Run the
+  install action first. The GitHub Actions twin of the orb's update_database
+  command.
+author: juburr
+
+inputs:
+  caching:
+    description: >
+      Cache the vulnerability database between jobs with actions/cache. Jobs
+      reuse the cached database until Anchore publishes a newer one, and the
+      first job to download it caches it for the rest. Recommended, because
+      Anchore's database host can be slow or fail at peak hours. Each cached
+      database takes about 500 MiB of cache storage, roughly one a day.
+    default: "true"
+  database_dir:
+    description: >
+      Directory where Grype stores the vulnerability database. A leading ~ is
+      expanded to $HOME, and a relative path is resolved against the working
+      directory. The result is set as GRYPE_DB_CACHE_DIR for the update and
+      exported through GITHUB_ENV, so later steps of the job, such as scan,
+      use the same database.
+    default: "~/.cache/grype/db"
+
+runs:
+  using: composite
+  steps:
+    # As in the orb, the database is saved under a key naming the database
+    # and its build date, and the newest database built today, then on the
+    # two days before, then any is restored (see
+    # src/scripts/database_cache_key.sh). The keys hash the files that script
+    # writes, as CircleCI's {{ checksum }} does.
+    - name: Prepare vulnerability database cache location
+      id: location
+      if: inputs.caching == 'true' || inputs.caching == '1'
+      shell: bash
+      env:
+        PARAM_DATABASE_DIR: ${{ inputs.database_dir }}
+        ORB_DB_CACHE_KEY_PART: location
+        ORB_DB_CACHE_KEY_PREFIX: ${{ runner.temp }}/grype-orb-db-cache
+      run: |
+        bash "${GITHUB_ACTION_PATH}/../../src/scripts/database_cache_key.sh"
+        hash() { sha256sum < "${ORB_DB_CACHE_KEY_PREFIX}-$1" | cut -c1-64; }
+        prefix="grype-vuln-db-v2-$(hash location)-"
+        delimiter="ghadelimiter_$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
+        {
+          printf 'prefix=%s\n' "${prefix}"
+          printf 'key=%s%s-\n' "${prefix}" "$(hash day0)"
+          printf 'restore-keys<<%s\n' "${delimiter}"
+          printf '%s%s-\n' "${prefix}" "$(hash day0)" "${prefix}" "$(hash day1)" "${prefix}" "$(hash day2)"
+          printf '%s\n' "${prefix}" "${delimiter}"
+        } >> "${GITHUB_OUTPUT}"
+    - name: Restore vulnerability database cache
+      id: restore
+      if: inputs.caching == 'true' || inputs.caching == '1'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.database_dir }}
+        key: ${{ steps.location.outputs.key }}
+        restore-keys: ${{ steps.location.outputs.restore-keys }}
+    - name: Update vulnerability database
+      shell: bash
+      env:
+        PARAM_DATABASE_DIR: ${{ inputs.database_dir }}
+      run: bash "${GITHUB_ACTION_PATH}/../run_script.sh" "${GITHUB_ACTION_PATH}/../../src/scripts/update_database.sh"
+    - name: Prepare vulnerability database cache key
+      id: database
+      if: inputs.caching == 'true' || inputs.caching == '1'
+      shell: bash
+      env:
+        ORB_DB_CACHE_KEY_PART: database
+        ORB_DB_CACHE_KEY_PREFIX: ${{ runner.temp }}/grype-orb-db-cache
+        PREFIX: ${{ steps.location.outputs.prefix }}
+      run: |
+        bash "${GITHUB_ACTION_PATH}/../../src/scripts/database_cache_key.sh"
+        hash() { sha256sum < "${ORB_DB_CACHE_KEY_PREFIX}-$1" | cut -c1-64; }
+        printf 'key=%s%s-%s\n' "${PREFIX}" "$(hash built)" "$(hash database)" >> "${GITHUB_OUTPUT}"
+    # A saved cache can't be replaced, so a job that restored the database it
+    # ended up with saves nothing.
+    - name: Save vulnerability database cache
+      if: (inputs.caching == 'true' || inputs.caching == '1') && steps.restore.outputs.cache-matched-key != steps.database.outputs.key
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.database_dir }}
+        key: ${{ steps.database.outputs.key }}
+    - name: Log vulnerability databases
+      shell: bash
+      run: grype db list

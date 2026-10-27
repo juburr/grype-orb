@@ -2,27 +2,29 @@
 
 <img src="assets/logos/grype-orb-512px.png" width="256" alt="Grype Orb logo: a one-eyed blue monster in front of a lighthouse, a container ship and a ship's wheel">
 
-# Grype Orb for CircleCI
+# Grype for CircleCI and GitHub Actions
 
 ### Find known vulnerabilities in your images and SBOMs before they ship.
 
 Install [Grype](https://github.com/anchore/grype), scan container images, SBOMs and source trees, and fail the build<br>
-when a vulnerability crosses the severity line you set, with three steps of CircleCI config.<br>
+when a vulnerability crosses the severity line you set, with three steps of CircleCI config or three GitHub Actions.<br>
 Strict SHA-512 verification by default · No `sudo` · amd64 and arm64
 
 [![CircleCI Build Status](https://circleci.com/gh/juburr/grype-orb.svg?style=shield "CircleCI Build Status")](https://circleci.com/gh/juburr/grype-orb)
+[![GitHub Actions Status](https://github.com/juburr/grype-orb/actions/workflows/actions.yml/badge.svg?branch=main "GitHub Actions Status")](https://github.com/juburr/grype-orb/actions/workflows/actions.yml)
 [![CircleCI Orb Version](https://badges.circleci.com/orbs/juburr/grype-orb.svg)](https://circleci.com/developer/orbs/orb/juburr/grype-orb)
 [![GitHub License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
 [![CircleCI Community](https://img.shields.io/badge/community-CircleCI%20Discuss-343434.svg)](https://discuss.circleci.com/c/ecosystem/orbs)
 
+![CircleCI orb and GitHub Actions](https://img.shields.io/badge/CI-CircleCI%20%7C%20GitHub%20Actions-F97316?style=for-the-badge)
 ![SARIF, JSON, CycloneDX and table reports](https://img.shields.io/badge/reports-SARIF%20%7C%20JSON%20%7C%20CycloneDX-7C3AED?style=for-the-badge&logoColor=white)
 ![amd64 and arm64](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-0EA5E9?style=for-the-badge&logo=linux&logoColor=white)
 ![SHA-512 verified by default](https://img.shields.io/badge/SHA--512-strict%20by%20default-16A34A?style=for-the-badge)
 ![No sudo required](https://img.shields.io/badge/sudo-not%20required-DB2777?style=for-the-badge)
 
-**[Quick Start](#-quick-start)** · **[Features](#-why-grype-orb)** · **[Reports](#-reports)** · **[VEX](#-vex)** · **[Recipes](#-recipes)** · **[Commands](#-commands)** · **[Security](#-secure-by-design)**
+**[Quick Start](#-quick-start)** · **[Features](#-why-grype-orb)** · **[Reports](#-reports)** · **[VEX](#-vex)** · **[Recipes](#-recipes)** · **[CircleCI Commands](#-circleci-commands)** · **[GitHub Actions](#-github-actions)** · **[Security](#-secure-by-design)**
 
-<sub>An unofficial, community-maintained orb. [Contributions are welcome!](#-contributing)</sub>
+<sub>An unofficial, community-maintained CircleCI orb and set of GitHub Actions. [Contributions are welcome!](#-contributing)</sub>
 
 </div>
 
@@ -56,7 +58,7 @@ Pass <a href="#-vex">OpenVEX documents</a> to drop findings you have marked <cod
 </td>
 <td width="33%" valign="top">
 ⚡ <b>Fast and multi-arch</b><br><br>
-Caches the Grype download and the vulnerability database between jobs, and installs the native amd64 or arm64 build for each machine.
+Caches the Grype download and the vulnerability database between jobs, and installs the native amd64 or arm64 build for each machine, on CircleCI or GitHub's runners.
 </td>
 </tr>
 </table>
@@ -97,13 +99,13 @@ flowchart LR
 
 ## 🚀 Quick Start
 
-Add the orb, install Grype, and scan. The job below fails if the image has any vulnerability rated `high` or `critical`:
+Install Grype, update its database, and scan. The jobs below fail if the image has any vulnerability rated `high` or `critical`. On CircleCI, add the orb to `.circleci/config.yml`:
 
 ```yaml
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@1.0.1
+  grype: juburr/grype-orb@1.1.0
 
 jobs:
   vulnerability_scan:
@@ -126,9 +128,36 @@ workflows:
       - vulnerability_scan
 ```
 
-Swap in your image, push, and the SARIF report shows up under the job's **Artifacts** tab: with the default `output`, `scan` writes it to `grype-scan-results.sarif`. `source` also takes SBOMs, directories and more (see [Scan Sources](#-scan-sources)), and `output` can write JSON, CycloneDX or a table in the step log (see [Reports](#-reports)).
+On GitHub Actions, use the `install`, `update_database` and `scan` actions in a workflow, such as `.github/workflows/vulnerability-scan.yml`:
 
-CircleCI has no `latest` tag for registry orbs, so pin a release. The orb version badge above shows the newest one.
+```yaml
+name: Vulnerability scan
+
+on: push
+
+jobs:
+  vulnerability-scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: juburr/grype-orb/actions/install@v1.1.0
+      - uses: juburr/grype-orb/actions/update_database@v1.1.0
+      - uses: juburr/grype-orb/actions/scan@v1.1.0
+        with:
+          source: gcr.io/distroless/base:latest
+          fail_on: high
+      # Keep the report even when fail_on fails the scan step.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: grype-report
+          path: grype-scan-results.sarif
+```
+
+See [GitHub Actions](#-github-actions) for how the actions map to the orb's commands.
+
+Swap in your image, push, and the SARIF report shows up under the job's **Artifacts** tab (on GitHub, the run's **Artifacts** section): with the default `output`, `scan` writes it to `grype-scan-results.sarif`. `source` also takes SBOMs, directories and more (see [Scan Sources](#-scan-sources)), and `output` can write JSON, CycloneDX or a table in the step log (see [Reports](#-reports)).
+
+CircleCI has no `latest` tag for registry orbs, so pin a release (for the actions, a release tag such as `v1.1.0`). The orb version badge above shows the newest one.
 
 > [!TIP]
 > Upgrading from `scan_image`? v1.0.0 renames it and several of its parameters. See [Upgrading](#-upgrading).
@@ -215,7 +244,7 @@ Pin the executor image and the Grype release with pipeline parameters, so neithe
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@1.0.1
+  grype: juburr/grype-orb@1.1.0
 
 parameters:
   cimg_base_version:
@@ -274,7 +303,7 @@ jobs:
           fail_on: critical
 ```
 
-## 🧰 Commands
+## 🧰 CircleCI Commands
 
 ### `grype/install`
 
@@ -311,6 +340,28 @@ Scans an image, SBOM, directory or other Grype source, writes reports, and can f
 
 Environment variables are expanded in `install`'s `version` and `install_path`, `update_database`'s `database_dir`, and `scan`'s `source`, `config`, `vex` and `output`.
 
+## ⚡ GitHub Actions
+
+Each of the orb's commands has a GitHub Action of the same name. The actions run the same scripts as the orb, so they install, verify, update and scan the same way, and take the same inputs with the same defaults.
+
+| Action | Orb command | Inputs |
+| --- | --- | --- |
+| `juburr/grype-orb/actions/install` | [`grype/install`](#grypeinstall) | `version`, `verify_checksums`, `caching`, `install_path` |
+| `juburr/grype-orb/actions/update_database` | [`grype/update_database`](#grypeupdate_database) | `caching`, `database_dir` |
+| `juburr/grype-orb/actions/scan` | [`grype/scan`](#grypescan) | `source` (required), `fail_on`, `only_fixed`, `config`, `vex`, `output` |
+
+The [Quick Start](#-quick-start) shows a complete workflow. How they differ from the orb's commands:
+
+- **Versions.** An action is referenced by the repository's release tag, such as `v1.1.0`, the same tag the orb is published from. There is no moving major tag such as `v1` yet. For the strongest pinning, use the tag's commit SHA: `juburr/grype-orb/actions/scan@<sha> # v1.1.0`.
+- **Environment variables.** The orb expands `$NAME` in its string parameters with the CircleCI CLI, which GitHub's runners don't have, so the actions take values as they are. Use GitHub's expressions instead, such as `source: ghcr.io/my-org/my-app:${{ github.sha }}`. A leading `~` in `install_path` and `database_dir` is still the home directory.
+- **`fail_on` and `only_fixed`.** CircleCI checks the orb's enum and boolean before any step runs. The action's inputs are plain strings, which the scan script checks before running Grype: `only_fixed` takes `true` or `false`.
+- **Caching.** `install` caches the verified release, and `update_database` the database, with [`actions/cache`](https://github.com/actions/cache), using the same key ingredients as the orb. As on CircleCI, the database is saved under a key naming the database, and the newest one built today, then on the two days before, then any, is restored. A job that restored the database it ends up with saves nothing. The caches count toward the repository's GitHub Actions cache storage, which GitHub limits (10 GB by default) by evicting the least recently used caches.
+- **`PATH` and `GRYPE_DB_CACHE_DIR`.** `install` puts `install_path` on the `PATH` of later steps through `GITHUB_PATH`, and `update_database` exports `GRYPE_DB_CACHE_DIR` through `GITHUB_ENV`.
+- **Reports.** As with the orb, reports stay where `output` puts them. Keep them with [`actions/upload-artifact`](https://github.com/actions/upload-artifact), or upload a SARIF report to GitHub code scanning.
+- **Runners.** CI installs on `ubuntu-24.04` and `ubuntu-24.04-arm`, one install from the cache with the download hosts blocked. It also updates and caches the database, and runs the same image, directory, VEX and multi-report scans as on CircleCI.
+
+The actions are composite actions in [`actions/`](actions), next to the orb's source. Each passes its inputs to the orb's script as environment variables, and [`actions/run_script.sh`](actions/run_script.sh) gives the script what CircleCI would: a `BASH_ENV` file for the values it hands to later steps, which it then passes on through `GITHUB_PATH` and `GITHUB_ENV`.
+
 ## 📦 Upgrading
 
 ### From 1.0.0 to 1.0.1
@@ -343,7 +394,7 @@ Behavior changes:
 - **Least Privilege**: Installs to a user-owned directory by default, with no `sudo` usage anywhere in this orb.
 - **Integrity**: SHA-512 checksum validation of downloaded binaries, on by default and failing closed: a Grype version this orb has no checksum for is refused, not installed unverified, and a binary that can't run on the executor never replaces an existing install. See [Checksum Verification](#-checksum-verification) for the `known_versions` and `"false"` opt-outs.
 - **Provenance**: Installs directly from Grype's official [releases page](https://github.com/anchore/grype/releases/) on GitHub. No third-party websites, domains, or proxies are used.
-- **Confidentiality**: All secrets and environment variables are handled in accordance with CircleCI's [security recommendations](https://circleci.com/docs/security-recommendations/) and [best practices](https://circleci.com/docs/orbs-best-practices/). Several `output` entries are refused on Grype 0.68.0 through 0.104.0, which can write registry credentials into JSON reports ([GHSA-6gxw-85q2-q646](https://github.com/anchore/grype/security/advisories/GHSA-6gxw-85q2-q646)).
+- **Confidentiality**: All secrets and environment variables are handled in accordance with CircleCI's [security recommendations](https://circleci.com/docs/security-recommendations/) and [best practices](https://circleci.com/docs/orbs-best-practices/). The GitHub Actions pass inputs to the scripts as environment variables, never pasting them into a script, and pin the actions they use (`actions/cache`) to a commit SHA. Several `output` entries are refused on Grype 0.68.0 through 0.104.0, which can write registry credentials into JSON reports ([GHSA-6gxw-85q2-q646](https://github.com/anchore/grype/security/advisories/GHSA-6gxw-85q2-q646)).
 - **Privacy**: No usage data of any kind is collected or shipped back to the orb developer. Grype itself checks `toolbox-data.anchore.io` for a newer release when it starts, unless `GRYPE_CHECK_FOR_APP_UPDATE` is `false`. See [Network Access](#-network-access).
 
 > [!IMPORTANT]
@@ -363,6 +414,8 @@ Linux arm64 builds were first published in Grype 0.24.0, so arm64 executors need
 `install` needs bash 4 or newer, `curl` or `wget`, `awk`, `tar`, `gzip`, and the standard coreutils, including `mktemp` and, when it verifies, `sha512sum`. CircleCI's `cimg` and machine images have all of them.
 
 The download cache is keyed by Grype version, executor architecture and home directory, so amd64 and arm64 jobs never share a cached binary. On executors whose `PATH` doesn't already include `install_path` (for example, machine executors), `install` adds it for later steps through `BASH_ENV`.
+
+The [GitHub Actions](#-github-actions) run on GitHub-hosted `ubuntu-24.04` (amd64) and `ubuntu-24.04-arm` (arm64) runners, which CI covers, and on self-hosted Linux runners with the same tools.
 
 ## 🔐 Checksum Verification
 
@@ -398,7 +451,7 @@ Optional hosts. Grype carries on without them:
 | --- | --- | --- |
 | `toolbox-data.anchore.io` | The update check Grype runs at startup, on every version | If this host is blocked, the check logs an error and the scan continues. Set `GRYPE_CHECK_FOR_APP_UPDATE=false` to skip it. |
 
-`caching` defaults to `true` on `install` and `update_database`, so those steps also use CircleCI's cache storage. On CircleCI Cloud, the [runner FAQ](https://circleci.com/docs/guides/execution-runner/runner-faqs/#what-connectivity-is-required) lists what a runner needs to reach; on CircleCI Server, it is your installation's object storage. Allow it, or set `caching: false`.
+`caching` defaults to `true` on `install` and `update_database`, so those steps also use CircleCI's cache storage. On CircleCI Cloud, the [runner FAQ](https://circleci.com/docs/guides/execution-runner/runner-faqs/#what-connectivity-is-required) lists what a runner needs to reach; on CircleCI Server, it is your installation's object storage. Allow it, or set `caching: false`. On GitHub Actions, the caches use GitHub's cache service through `actions/cache`. GitHub-hosted runners always can; a self-hosted runner needs the hosts GitHub lists for [communication with GitHub](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners#communication-between-self-hosted-runners-and-github).
 
 ## 🤝 Contributing
 
@@ -406,7 +459,7 @@ This is an unofficial, community-maintained orb, and contributions are welcome! 
 
 - **Found a bug or have an idea?** [Open an issue](https://github.com/juburr/grype-orb/issues).
 - **Need a newer Grype release?** Generate its checksums with `src/scripts/install_hash.sh -v <version>`, paste them into the `sha512sums` table in [`src/scripts/install.sh`](src/scripts/install.sh), and open a pull request. The script prints entries for both architectures after checking each asset against `grype_<version>_checksums.txt`, the SHA-256 list Grype publishes with each release, and needs `cosign` to verify that list's keyless Sigstore signature for releases from 0.72.0 on. It also needs bash 4 or newer, `curl`, `awk`, `sed`, `tar`, `gzip` and the standard coreutils, including `mktemp`, `sha256sum` and `sha512sum`. For a release with nothing published to check against, `-c` takes a checksum from another official source (a SHA-1 one also needs `sha1sum`), or `NONE`; it never overrides what the release did publish.
-- **Before opening a pull request**, run the checks CI runs. The tests run offline, with stand-ins for `grype` and the downloads they need; `circleci orb validate` checks the packed orb against the CircleCI API, so it needs network access. CI also runs integration tests on amd64 and arm64.
+- **Before opening a pull request**, run the checks CI runs. The tests run offline, with stand-ins for `grype` and the downloads they need; `circleci orb validate` checks the packed orb against the CircleCI API, so it needs network access. CI also runs integration tests on amd64 and arm64, with the orb's commands on CircleCI and the actions on GitHub's runners. A change to a command's parameters needs the same change to its action in `actions/`, which `tests/actions_test.sh` checks.
 
   ```bash
   yamllint .
@@ -433,5 +486,5 @@ Grype is an open source project by [Anchore](https://anchore.com).
   <br>
   <sub>Know what's vulnerable before it ships. If this orb helps your team, a ⭐ helps others find it.</sub>
   <br>
-  <sub><a href="#grype-orb-for-circleci">Back to top ↑</a></sub>
+  <sub><a href="#grype-for-circleci-and-github-actions">Back to top ↑</a></sub>
 </div>

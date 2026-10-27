@@ -1,0 +1,235 @@
+# Tests the GitHub Actions in actions/ on GitHub's own runners, as
+# .circleci/test-deploy.yml tests the orb's commands on CircleCI. Each job
+# runs the actions from this checkout (uses: ./actions/...), so a pull
+# request tests its own changes. The bats tests run in CircleCI's setup
+# workflow.
+name: GitHub Actions
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run the offline tests
+        run: |
+          for test in tests/actions_test.sh tests/install_test.sh tests/shell_conventions_test.sh; do
+            echo "=== ${test}"
+            bash "${test}"
+          done
+
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/install
+      - name: Verify the install
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          version=$(grep -A3 '^  version:' src/commands/install.yml | sed -n 's/^    default: "\(.*\)"$/\1/p')
+          [[ "$(command -v grype)" == "${HOME}/bin/grype" ]]
+          grype version | tee "${RUNNER_TEMP}/version.log"
+          grep -E "^Version:[[:space:]]+${version}$" "${RUNNER_TEMP}/version.log"
+          grep -E "^Platform:[[:space:]]+${PLATFORM}$" "${RUNNER_TEMP}/version.log"
+      # The first install saved the release to the cache, so this one
+      # restores it. It goes to a directory of its own, which later steps
+      # find first on the PATH.
+      - uses: ./actions/install
+        with:
+          install_path: ${{ runner.temp }}/second
+      - name: Verify the second install comes first on the PATH
+        env:
+          SECOND: ${{ runner.temp }}/second
+        run: |
+          [[ "$(command -v grype)" == "${SECOND}/grype" ]]
+          grype version
+      - name: Install an unlisted version, which must fail
+        id: unlisted
+        continue-on-error: true
+        uses: ./actions/install
+        with:
+          version: 0.0.1
+          caching: false
+          install_path: ${{ runner.temp }}/unlisted
+      - name: Verify it failed before installing anything
+        env:
+          OUTCOME: ${{ steps.unlisted.outcome }}
+          UNLISTED: ${{ runner.temp }}/unlisted
+        run: |
+          [[ "${OUTCOME}" == failure ]]
+          [[ ! -e "${UNLISTED}/grype" ]]
+
+  # A fresh runner with the release's download hosts blocked installs from
+  # the cache the install job saved, which only works if the cache is used.
+  install-from-cache:
+    needs: install
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Block the download hosts
+        run: |
+          echo "127.0.0.1 github.com objects.githubusercontent.com release-assets.githubusercontent.com" | sudo tee -a /etc/hosts
+          if curl -sSf --max-time 10 -o /dev/null https://github.com; then
+            echo "github.com is still reachable."
+            exit 1
+          fi
+      - uses: ./actions/install
+      - name: Verify the install
+        run: |
+          version=$(grep -A3 '^  version:' src/commands/install.yml | sed -n 's/^    default: "\(.*\)"$/\1/p')
+          grype version | grep -E "^Version:[[:space:]]+${version}$"
+
+  # The database and scans of test-deploy.yml's command-test: the database
+  # cache keys, a second update that restores the first one's database and
+  # keeps its key, and scans of an image, a directory with a config and
+  # only_fixed, VEX, and several report formats at once.
+  scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/install
+      - uses: ./actions/update_database
+      - name: Verify the database cache keys
+        run: |
+          # The keys are computed from these files: the location, and the
+          # database the job ended up with. GRYPE_DB_CACHE_DIR came through
+          # GITHUB_ENV.
+          [[ "${GRYPE_DB_CACHE_DIR}" == "${HOME}/.cache/grype/db" ]]
+          schema=$(grype version | awk -F: '/^Supported DB Schema:/ { gsub(/[[:space:]]/, "", $2); print $2 }')
+          printf '%s\n%s\n\n%s\n%s\n' "${HOME}" '~/.cache/grype/db' "${schema}" \
+            https://grype.anchore.io/databases | cmp - "${RUNNER_TEMP}/grype-orb-db-cache-location"
+          cat "${RUNNER_TEMP}/grype-orb-db-cache-database"
+          built=$(grype db status | awk '/^[[:space:]]*Built:/ { $1 = ""; sub(/^ /, ""); print }')
+          grep -qxF "Built: ${built}" "${RUNNER_TEMP}/grype-orb-db-cache-database"
+          [[ "$(cat "${RUNNER_TEMP}/grype-orb-db-cache-built")" == "${built:0:10}" ]]
+          cp "${RUNNER_TEMP}/grype-orb-db-cache-database" "${RUNNER_TEMP}/first-db-cache-database"
+      # A second update restores the database the first one just saved, finds
+      # it current, and keys it the same, so the save is skipped.
+      - uses: ./actions/update_database
+      - name: Verify the restored database keeps its key
+        run: cmp "${RUNNER_TEMP}/first-db-cache-database" "${RUNNER_TEMP}/grype-orb-db-cache-database"
+      - uses: ./actions/scan
+        with:
+          source: gcr.io/distroless/base:latest
+          output: json=distroless.base.scan.json
+      - name: Check the image scan
+        run: jq -e '.matches | type == "array"' distroless.base.scan.json
+      - name: Create a minimal Grype policy file
+        run: printf '{}\n' > "${RUNNER_TEMP}/grype-orb-test.yaml"
+      - uses: ./actions/scan
+        with:
+          source: dir:.
+          config: ${{ runner.temp }}/grype-orb-test.yaml
+          only_fixed: true
+          output: json=repository.scan.json
+      - name: Verify the directory scan
+        run: test -s repository.scan.json
+      # The fixture SBOM holds zlib 1.2.11-r3 from Alpine 3.15, whose two
+      # CVEs don't change any more. The OpenVEX fixture marks only the
+      # Critical one (CVE-2022-37434) not_affected.
+      - uses: ./actions/scan
+        with:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          output: json=vex-baseline.scan.json
+      - name: Verify the VEX fixture baseline
+        run: jq -e '[.matches[] | select(.vulnerability.severity == "Critical") | .vulnerability.id] == ["CVE-2022-37434"]' vex-baseline.scan.json
+      - uses: ./actions/scan
+        with:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          vex: tests/fixtures/vex/zlib.openvex.json
+          fail_on: critical
+          output: json=vex-parameter.scan.json
+      - uses: ./actions/scan
+        with:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          config: tests/fixtures/vex/grype.yaml
+          fail_on: critical
+          output: json=vex-config.scan.json
+      - name: Verify VEX filtering
+        run: |
+          for report in vex-parameter.scan.json vex-config.scan.json; do
+            echo "Checking ${report}"
+            jq -e 'all(.matches[]; .vulnerability.id != "CVE-2022-37434")' "${report}"
+            jq -e 'any(.ignoredMatches[]; .vulnerability.id == "CVE-2022-37434")' "${report}"
+            jq -e 'any(.matches[]; .vulnerability.id == "CVE-2018-25032")' "${report}"
+          done
+      # Without VEX, the Critical CVE must fail the step at fail_on critical.
+      - name: Scan at fail_on critical without VEX, which must fail
+        id: critical
+        continue-on-error: true
+        uses: ./actions/scan
+        with:
+          source: sbom:tests/fixtures/vex/zlib.cdx.json
+          fail_on: critical
+          output: json=critical.scan.json
+      - name: Verify fail_on failed the step
+        env:
+          OUTCOME: ${{ steps.critical.outcome }}
+        run: '[[ "${OUTCOME}" == failure ]]'
+      - uses: ./actions/scan
+        with:
+          source: gcr.io/distroless/base:latest
+          output: json=multi/distroless.base.scan.json,table=multi/distroless.base.scan.txt,sarif
+      - name: Verify multiple report formats
+        run: |
+          jq -e '.matches | type == "array"' multi/distroless.base.scan.json
+          test -s multi/distroless.base.scan.txt
+          test ! -e grype-scan-results.sarif
+
+  # Runs natively on the Arm runner, with the default scan output and a
+  # database_dir other than the default, without caching.
+  scan-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/install
+      - uses: ./actions/update_database
+        with:
+          caching: false
+          database_dir: ~/grype-orb-test-db
+      - name: Verify database_dir is exported
+        run: |
+          [[ "${GRYPE_DB_CACHE_DIR}" == "${HOME}/grype-orb-test-db" ]]
+          grype db status | tee grype-db-status.txt
+          grep -F "${HOME}/grype-orb-test-db/" grype-db-status.txt
+      - uses: ./actions/scan
+        with:
+          source: dir:.
+      - name: Verify the arm64 scan
+        run: jq -e '.runs | type == "array"' grype-scan-results.sarif
