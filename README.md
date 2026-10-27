@@ -486,5 +486,5 @@ Grype is an open source project by [Anchore](https://anchore.com).
   <br>
   <sub>Know what's vulnerable before it ships. If this orb helps your team, a ⭐ helps others find it.</sub>
   <br>
-  <sub><a href="#grype-orb-for-circleci">Back to top ↑</a></sub>
+  <sub><a href="#grype-for-circleci-and-github-actions">Back to top ↑</a></sub>
 </div>
