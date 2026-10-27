@@ -2,13 +2,24 @@
 
 set -euo pipefail
 
+# subst VALUE: expands environment variables in VALUE with the CircleCI CLI,
+# which reads it on stdin. Without the CLI, as in GitHub Actions or a local
+# run, the value is used as it is.
+subst() {
+    if command -v circleci > /dev/null 2>&1; then
+        printf '%s' "$1" | circleci env subst
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
 # Read in orb parameters
-FAIL_ON=$(printf '%s' "${PARAM_FAIL_ON}" | circleci env subst)
-CONFIG=$(printf '%s' "${PARAM_CONFIG}" | circleci env subst)
-ONLY_FIXED=$(printf '%s' "${PARAM_ONLY_FIXED}" | circleci env subst)
-OUTPUT=$(printf '%s' "${PARAM_OUTPUT}" | circleci env subst)
-SOURCE=$(printf '%s' "${PARAM_SOURCE}" | circleci env subst)
-VEX=$(printf '%s' "${PARAM_VEX}" | circleci env subst)
+FAIL_ON=$(subst "${PARAM_FAIL_ON}")
+CONFIG=$(subst "${PARAM_CONFIG}")
+ONLY_FIXED=$(subst "${PARAM_ONLY_FIXED}")
+OUTPUT=$(subst "${PARAM_OUTPUT}")
+SOURCE=$(subst "${PARAM_SOURCE}")
+VEX=$(subst "${PARAM_VEX}")
 
 if [[ -z "${SOURCE}" ]]; then
     echo "ERROR: source is required, but it is empty." >&2

@@ -40,3 +40,25 @@ command_default() {
         found && /^  [^ ]/ { exit }
     ' "${COMMANDS_DIR}/$1.yml"
 }
+
+# without_circleci_cli: removes the circleci stub and puts the PATH's other
+# executables, but no circleci, in a directory of their own that replaces the
+# PATH, as on GitHub's runners. CircleCI's executors have the real CLI in
+# /bin, so leaving /bin on the PATH wouldn't hide it.
+without_circleci_cli() {
+    local nocli="${BATS_TEST_TMPDIR}/nocli-bin" dir file name
+    rm -f "${STUB_DIR}/circleci"
+    mkdir -p "${nocli}"
+    local IFS=:
+    for dir in ${PATH}; do
+        [[ -d "${dir}" && "${dir}" != "${STUB_DIR}" ]] || continue
+        for file in "${dir}"/*; do
+            name=${file##*/}
+            if [[ "${name}" != circleci && -x "${file}" && ! -d "${file}" && ! -e "${nocli}/${name}" ]]; then
+                ln -s "${file}" "${nocli}/${name}"
+            fi
+        done
+    done
+    PATH="${STUB_DIR}:${nocli}"
+    export PATH
+}
