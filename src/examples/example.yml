@@ -5,7 +5,7 @@ description: >
 usage:
   version: 2.1
   orbs:
-    grype: juburr/grype-orb@1.1.0
+    grype: juburr/grype-orb@1.1.1
   jobs:
     vulnerability-scan:
       docker:
