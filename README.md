@@ -105,7 +105,7 @@ Install Grype, update its database, and scan. The jobs below fail if the image h
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@1.1.1
+  grype: juburr/grype-orb@1.1.2
 
 jobs:
   vulnerability_scan:
@@ -139,9 +139,9 @@ jobs:
   vulnerability-scan:
     runs-on: ubuntu-24.04
     steps:
-      - uses: juburr/grype-orb/actions/install@v1.1.1
-      - uses: juburr/grype-orb/actions/update_database@v1.1.1
-      - uses: juburr/grype-orb/actions/scan@v1.1.1
+      - uses: juburr/grype-orb/actions/install@v1.1.2
+      - uses: juburr/grype-orb/actions/update_database@v1.1.2
+      - uses: juburr/grype-orb/actions/scan@v1.1.2
         with:
           source: gcr.io/distroless/base:latest
           fail_on: high
@@ -157,7 +157,7 @@ See [GitHub Actions](#-github-actions) for how the actions map to the orb's comm
 
 Swap in your image, push, and the SARIF report shows up under the job's **Artifacts** tab (on GitHub, the run's **Artifacts** section): with the default `output`, `scan` writes it to `grype-scan-results.sarif`. `source` also takes SBOMs, directories and more (see [Scan Sources](#-scan-sources)), and `output` can write JSON, CycloneDX or a table in the step log (see [Reports](#-reports)).
 
-CircleCI has no `latest` tag for registry orbs, so pin a release (for the actions, a release tag such as `v1.1.1`). The orb version badge above shows the newest one.
+CircleCI has no `latest` tag for registry orbs, so pin a release (for the actions, a release tag such as `v1.1.2`). The orb version badge above shows the newest one.
 
 > [!TIP]
 > Upgrading from `scan_image`? v1.0.0 renames it and several of its parameters. See [Upgrading](#-upgrading).
@@ -244,7 +244,7 @@ Pin the executor image and the Grype release with pipeline parameters, so neithe
 version: 2.1
 
 orbs:
-  grype: juburr/grype-orb@1.1.1
+  grype: juburr/grype-orb@1.1.2
 
 parameters:
   cimg_base_version:
@@ -352,7 +352,7 @@ Each of the orb's commands has a GitHub Action of the same name. The actions run
 
 The [Quick Start](#-quick-start) shows a complete workflow. How they differ from the orb's commands:
 
-- **Versions.** An action is referenced by the repository's release tag, such as `v1.1.1`, the same tag the orb is published from. There is no moving major tag such as `v1` yet. For the strongest pinning, use the tag's commit SHA: `juburr/grype-orb/actions/scan@<sha> # v1.1.1`.
+- **Versions.** An action is referenced by the repository's release tag, such as `v1.1.2`, the same tag the orb is published from. There is no moving major tag such as `v1` yet. For the strongest pinning, use the tag's commit SHA: `juburr/grype-orb/actions/scan@<sha> # v1.1.1`.
 - **Environment variables.** The orb expands `$NAME` in its string parameters with the CircleCI CLI, which GitHub's runners don't have, so the actions take values as they are. Use GitHub's expressions instead, such as `source: ghcr.io/my-org/my-app:${{ github.sha }}`. A leading `~` in `install_path` and `database_dir` is still the home directory.
 - **`fail_on` and `only_fixed`.** CircleCI checks the orb's enum and boolean before any step runs. The action's inputs are plain strings, which the scan script checks before running Grype: `only_fixed` takes `true` or `false`.
 - **Caching.** `install` caches the verified release, and `update_database` the database, with [`actions/cache`](https://github.com/actions/cache), using the same key ingredients as the orb. As on CircleCI, the database is saved under a key naming the database, and the newest one built today, then on the two days before, then any, is restored. A job that restored the database it ends up with saves nothing. The caches count toward the repository's GitHub Actions cache storage, which GitHub limits (10 GB by default) by evicting the least recently used caches.
